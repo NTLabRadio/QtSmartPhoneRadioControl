@@ -14,11 +14,8 @@ MainWindow::MainWindow(QWidget *parent) :
     //Создание меню верхнего уровня
     CreateMenuBar();
 
-    //Объект QTimer для периодического контроля подключения/отключения устройств
-    timerPollingCOMDevices = new QTimer(this);
-    connect(timerPollingCOMDevices,SIGNAL(timeout()),this,SLOT(CheckCOMDevices()));
-    timerPollingCOMDevices->setInterval(PERIOD_MS_POLLING_COM_DEVICES);
-    timerPollingCOMDevices->start();
+    //Инициализируем процесс периодического контроля подключения/отключения COM-устройств
+    InitPollingCOMDevices();
 
     // Присоединяем к сигналу успешного подключения устройства слот запроса ID устройства
     connect(RadioDevice, SIGNAL(signalConnectDevice()), this, SLOT(RequestR181GenParams()));
@@ -59,6 +56,12 @@ void MainWindow::CreateMenuBar()
 
 //-------------------------------------------------------------------------------------------------------------
 //Поиск в системе COM-портов и их отображение в меню верхнего уровня
+//
+// TODO Эта функция не должна непосредственно использовать класс QSerialPortInfo, определять
+// свойства COM-устройств, сравнивать ID производителя и продукта с заданными. Это должны делать
+// функции другого уровня абстракции. Данная функция должна лишь выводить текстовую
+// информацию, предоставленную классом для работы с COM-устройствами. Класс MainWindow не стоит
+// усложнять
 //-------------------------------------------------------------------------------------------------------------
 void MainWindow::ShowAvailPortsInMenu()
 {
@@ -70,7 +73,7 @@ void MainWindow::ShowAvailPortsInMenu()
     foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts())
     {
         // Создаем подпункт в меню "Подключить"
-        // При если идентифиактор продукта и производителя совпадет с идентификаторами, используемыми
+        // При если идентификатор продукта и производителя совпадет с идентификаторами, используемыми
         // по умолчанию радиостанциями, то это отражается в названии подпункта
         if(info.productIdentifier()==DE9943_PRODUCT_ID && info.vendorIdentifier()==DE9943_VENDOR_ID)
             actDevice = mnConnectDeviceSubMenu->addAction(info.portName() + " (DE9943)");
@@ -120,7 +123,31 @@ quint8 MainWindow::CloseConnectedDevice()
 }
 
 //-------------------------------------------------------------------------------------------------------------
+// Функция инициализации процесса периодического контроля подключения/отключения
+// COM-устройств
+//
+// TODO Эта функция должна принадлежать классу QSmartRadioModuleControl или другому
+// того же уровня абстракции. Класс MainWindow не стоит усложнять
+//-------------------------------------------------------------------------------------------------------------
+void MainWindow::InitPollingCOMDevices()
+{
+    //Объект QTimer для периодического контроля подключения/отключения устройств
+    timerPollingCOMDevices = new QTimer(this);
+    connect(timerPollingCOMDevices,SIGNAL(timeout()),this,SLOT(CheckCOMDevices()));
+    timerPollingCOMDevices->setInterval(PERIOD_MS_POLLING_COM_DEVICES);
+    timerPollingCOMDevices->start();
+
+    return;
+}
+
+
+//-------------------------------------------------------------------------------------------------------------
 // Функция отображает все COM-устройства, которые есть в системе, в поле textBrowser тестовой вкладки
+//
+// TODO Эта функция не должна непосредственно использовать класс QSerialPortInfo и определять свойства
+// COM-устройств. Это должны делать функции другого уровня абстракции. Данная функция должна лишь
+// выводить текстовую информацию, предоставленную классом для работы с COM-устройствами,
+// в textBrowser. Класс MainWindow не стоит усложнять
 //-------------------------------------------------------------------------------------------------------------
 void MainWindow::CheckCOMDevices()
 {

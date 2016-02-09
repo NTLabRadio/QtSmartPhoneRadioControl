@@ -70,7 +70,7 @@ en_results QSmartRadioModuleControl::ConnectDevice (QString ComPortName)
     serialPort->setPortName(ComPortName);
     if(serialPort->open(QIODevice::ReadWrite))  // открываем его
     {
-        if(!serialPort->setBaudRate(QSerialPort::Baud115200))
+        if(!serialPort->setBaudRate(QSerialPort::Baud57600))
         {
             qDebug() << "QRadioControl::ConnectDevice() Ошибка подключения к порту: setBaudRate error";
             return(RES_FAIL);

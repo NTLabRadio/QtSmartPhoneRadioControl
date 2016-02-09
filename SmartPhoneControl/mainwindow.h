@@ -11,11 +11,6 @@
 QT_USE_NAMESPACE
 
 
-#define DE9943_PRODUCT_ID          (0x0585)
-#define DE9943_VENDOR_ID            (0x1747)
-
-#define PERIOD_MS_POLLING_COM_DEVICES (1000)   //период опроса COM-устройств с целью отслеживания их присутствия в системе, мс
-
 namespace Ui {
 class MainWindow;
 }
@@ -37,14 +32,22 @@ private slots:
     void ShowAvailPortsInMenu();
 
 private:
+#define DE9943_PRODUCT_ID          (0x0585)             //ID продукта макетной платы радиоблока
+#define DE9943_VENDOR_ID            (0x1747)             //ID производителя макетной платы радиоблока
+
+#define PERIOD_MS_POLLING_COM_DEVICES (1000)   //период опроса COM-устройств с целью отслеживания их присутствия в системе, мс
+
+
     Ui::MainWindow *ui;
 
     QTimer *timerPollingCOMDevices;                 // Таймер для периодического контроля подключения/отключения устройств
 
     QSmartRadioModuleControl* RadioDevice;    // Объект для работы с устройством
 
-    void CreateMenuBar();                                 // Создание меню верхнего уровня
     QMenu* mnConnectDeviceSubMenu;            // Меню верхнего уровня. Пункт "Подключить"
+
+    void CreateMenuBar();
+    void InitPollingCOMDevices();
 };
 
 #endif // MAINWINDOW_H
