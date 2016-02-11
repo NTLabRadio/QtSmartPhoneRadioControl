@@ -177,3 +177,43 @@ void QSmartRadioModuleControl::ReadDataFromPort()
 
     return;
 }
+
+
+
+//-------------------------------------------------------------------------------------------------------------
+// QSmartRadioModuleControl::SendDataToPort()
+//
+// Описание:
+//  Функция посылает пакет на устройство
+//
+// Параметры:
+//  baDataForSend -- пакет в виде массива байт, который необходимо передать на устройство
+//
+// Возвращаемое значение:
+//  Функция возвращает результат передачи пакета на устройство
+//  0x0000 – пакет передан успешно;
+//  0xFFFF – при попытке передачи пакета возникли какие-то траблы на физическом уровне интерфейса
+//-------------------------------------------------------------------------------------------------------------
+en_results QSmartRadioModuleControl::SendDataToPort(QByteArray baDataForSend)
+{
+    quint64 res;
+
+    // Если устройство не подключено, сразу возвращаем ошибку
+    if(!isConnected())
+    {
+        qDebug() << "QSmartRadioModuleControl::SendDataToPort() ERROR: Устройство не подключено";
+        return(RES_FAIL);
+    }
+
+    // Посылаем данные в порт
+    res = serialPort->write(baDataForSend);
+
+    // Если не все данные переданы в порт, возвращаем ошибку
+    if (res != quint64(baDataForSend.size()))
+    {
+        qDebug() << "QSmartRadioModuleControl::SendDataToPort() ERROR: Пакет не передан полностью!";
+        return(RES_FAIL);
+    }
+
+    return(RES_SUCCESS);
+}

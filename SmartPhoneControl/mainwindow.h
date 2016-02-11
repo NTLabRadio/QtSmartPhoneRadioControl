@@ -7,6 +7,7 @@
 #include <QtSerialPort/QSerialPortInfo>
 
 #include "qSmartRadioModuleControl.h"
+#include "slipinterface.h"
 
 QT_USE_NAMESPACE
 
@@ -31,6 +32,8 @@ public slots:
 private slots:
     void ShowAvailPortsInMenu();
 
+    void on_pushButton_clicked();
+
 private:
 #define DE9943_PRODUCT_ID          (0x0585)             //ID продукта макетной платы радиоблока
 #define DE9943_VENDOR_ID            (0x1747)             //ID производителя макетной платы радиоблока
@@ -44,10 +47,15 @@ private:
 
     QSmartRadioModuleControl* RadioDevice;    // Объект для работы с устройством
 
+    SLIPInterface* objSLIPInterface;                    //Объект для работы с SLIP-интерфейсом
+
     QMenu* mnConnectDeviceSubMenu;            // Меню верхнего уровня. Пункт "Подключить"
 
     void CreateMenuBar();
     void InitPollingCOMDevices();
+
+    bool ConvertUTF8ToHexInt(quint8* pBufData,quint16 nSizeData);
+    bool ConvertHexIntToUTF8(quint8* pBufData, quint16 nSizeData);
 };
 
 #endif // MAINWINDOW_H

@@ -38,7 +38,7 @@ public:
     bool isConnected();
     QString portName();
 
-    en_results SendData(QByteArray baDataForSend);
+    en_results SendDataToPort(QByteArray baDataForSend);
 
 signals:
     void signalReceiveData(QByteArray baData);

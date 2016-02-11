@@ -138,8 +138,8 @@ uint8_t SLIPInterface::FormPack(uint8_t* pPayloadData, uint16_t nPayloadSize, ui
         return(RES_FAIL);
 
     //Первый символ пакета - FEND
-    *pPackData++ = FEND;
     nPackSize++;
+    *pPackData++ = FEND;
 
     while(nPayloadSize--)
     {
@@ -191,8 +191,8 @@ uint8_t SLIPInterface::FormPack(uint8_t* pPayloadData, uint16_t nPayloadSize, ui
     //проверки были проведены ранее
 
     //Последний символ пакета - FEND
-    *pPackData++ = FEND;
     nPackSize++;
+    *pPackData++ = FEND;    
 
     return(RES_SUCCESS);
 }
