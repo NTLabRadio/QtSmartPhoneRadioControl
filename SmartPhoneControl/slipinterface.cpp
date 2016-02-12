@@ -1,10 +1,72 @@
-#include "slipinterface.h"
+﻿#include "slipinterface.h"
 
 SLIPInterface::SLIPInterface()
 {
-
+	InterfaceState = STATE_IDLE;
+	
+	nPackSize = 0;
+	pPackData = &BufForSLIPData[0];
 }
 
+void SLIPInterface::WaitForPack()
+{
+	InterfaceState = STATE_WAIT_FOR_BEGIN_OF_PACK;
+	
+	nPackSize = 0;
+	pPackData = &BufForSLIPData[0];	
+}
+
+uint8_t SLIPInterface::CheckForSLIPData(uint8_t nByte, uint8_t* pPayloadPackData, uint16_t &nPayloadPackSize, uint8_t &nCheckState)
+{
+	uint16_t nPosEndOfPack;
+	
+	switch(InterfaceState)
+	{
+		case STATE_WAIT_FOR_BEGIN_OF_PACK:
+			if(nByte==FEND)	//Если принят символ начала пакета
+			{
+				//Изменяем состояние интерфейса на ожидание конца пакета
+				InterfaceState = STATE_WAIT_FOR_END_OF_PACK;
+
+				//Начинаем накопление данных
+				nPackSize = 0;
+				pPackData = &BufForSLIPData[0];
+				
+				*pPackData++ = nByte;
+				nPackSize++;
+			}
+			break;
+		case STATE_WAIT_FOR_END_OF_PACK:
+			//Проверка, не превысил ли счетчик накапливаемых данных допустимый размер пакета	
+			if(nPackSize>=SIZE_BUF_FOR_SLIP_DATA-1)
+			{
+				nCheckState = 0xFF;
+				return(0);
+			}
+		
+			//Накапливаем данные
+			nPackSize++;
+			*pPackData++ = nByte;			
+		
+			if(nByte==FEND)	//Если принят символ конца пакета
+			{
+				//Изменяем состоние интерфейса на бездействие
+				InterfaceState = STATE_IDLE;				
+				
+				//Обрабатываем накопленные данные, выполняя операцию байт-стаффинга
+				FindPackInData(&BufForSLIPData[0], nPackSize, pPayloadPackData, nPayloadPackSize, nPosEndOfPack);				
+				
+				nCheckState = InterfaceState;
+				return(1);
+			}				
+			break;
+		case STATE_IDLE:
+			break;
+	}
+	
+	nCheckState = InterfaceState;
+	return(0);
+}
 
 //---------------------------------------------------------------------------------------------------
 // Функция поиска SLIP пакета в массиве данных
@@ -29,7 +91,7 @@ SLIPInterface::SLIPInterface()
 //
 // ВНИМАНИЕ! Память для pPayloadPackData должна быть выделена предварительно
 //---------------------------------------------------------------------------------------------------
-uint8_t SLIPInterface::FindPackInData(uint8_t* pData, uint16_t nDataSize, uint8_t* pPayloadPackData, uint16_t nPayloadPackSize, uint16_t& nPosEndOfPack)
+uint8_t SLIPInterface::FindPackInData(uint8_t* pData, uint16_t nDataSize, uint8_t* pPayloadPackData, uint16_t& nPayloadPackSize, uint16_t& nPosEndOfPack)
 {
     uint16_t cntBytes = nDataSize;
     enFindPackState stateFindAutom = PACK_NO_FOUND;
@@ -37,7 +99,7 @@ uint8_t SLIPInterface::FindPackInData(uint8_t* pData, uint16_t nDataSize, uint8_
 
     while(cntBytes--)
     {
-        switch(*pData++)
+        switch(*pData)
         {
             case FEND:
                 if(stateFindAutom==PACK_NO_FOUND)
@@ -98,6 +160,7 @@ uint8_t SLIPInterface::FindPackInData(uint8_t* pData, uint16_t nDataSize, uint8_
                 }
                 break;
         }   //end of switch
+				pData++;
     }   //end of while
 
     return(stateFindAutom);
@@ -138,8 +201,8 @@ uint8_t SLIPInterface::FormPack(uint8_t* pPayloadData, uint16_t nPayloadSize, ui
         return(RES_FAIL);
 
     //Первый символ пакета - FEND
-    nPackSize++;
     *pPackData++ = FEND;
+    nPackSize++;
 
     while(nPayloadSize--)
     {
@@ -191,8 +254,8 @@ uint8_t SLIPInterface::FormPack(uint8_t* pPayloadData, uint16_t nPayloadSize, ui
     //проверки были проведены ранее
 
     //Последний символ пакета - FEND
+    *pPackData++ = FEND;
     nPackSize++;
-    *pPackData++ = FEND;    
 
     return(RES_SUCCESS);
 }

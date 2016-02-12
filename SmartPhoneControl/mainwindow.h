@@ -34,6 +34,8 @@ private slots:
 
     void on_pushButton_clicked();
 
+    void ReceiveDataFromRadioModule(QByteArray baRcvdData);
+
 private:
 #define DE9943_PRODUCT_ID          (0x0585)             //ID продукта макетной платы радиоблока
 #define DE9943_VENDOR_ID            (0x1747)             //ID производителя макетной платы радиоблока
@@ -56,6 +58,7 @@ private:
 
     bool ConvertUTF8ToHexInt(quint8* pBufData,quint16 nSizeData);
     bool ConvertHexIntToUTF8(quint8* pBufData, quint16 nSizeData);
+    bool ConvertHexIntToUTF8(quint8* pBufData, quint16 nSizeData, QString& strMes);
 };
 
 #endif // MAINWINDOW_H

@@ -47,21 +47,21 @@
       <property name="geometry">
        <rect>
         <x>40</x>
-        <y>100</y>
+        <y>50</y>
         <width>411</width>
         <height>147</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
-        <widget class="QLabel" name="SLIPPayload_label">
+        <widget class="QLabel" name="SLIPTxPayload_label">
          <property name="text">
           <string>Payload</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="SLIPPayload_lineEdit"/>
+        <widget class="QLineEdit" name="SLIPTxPayload_lineEdit"/>
        </item>
        <item>
         <widget class="QPushButton" name="pushButton">
@@ -78,10 +78,10 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="SLIPPack_lineEdit"/>
+        <widget class="QLineEdit" name="SLIPTxData_lineEdit"/>
        </item>
        <item>
-        <widget class="QLabel" name="SLIPPayloadFormatError_label">
+        <widget class="QLabel" name="SLIPTxStatus_label">
          <property name="enabled">
           <bool>true</bool>
          </property>
@@ -90,6 +90,55 @@
          </property>
          <property name="text">
           <string>SendStatus</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="">
+      <property name="geometry">
+       <rect>
+        <x>40</x>
+        <y>251</y>
+        <width>411</width>
+        <height>121</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <widget class="QLabel" name="SLIPRxData_label">
+         <property name="text">
+          <string>Received Data</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="SLIPRxData_lineEdit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="SLIPRxPayload_label">
+         <property name="text">
+          <string>Payload of Rcvd Data</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="SLIPRxPayload_lineEdit">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="SLIPRxStatus_label">
+         <property name="enabled">
+          <bool>true</bool>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">color: rgb(255, 0, 0);</string>
+         </property>
+         <property name="text">
+          <string>RcvStatus</string>
          </property>
         </widget>
        </item>

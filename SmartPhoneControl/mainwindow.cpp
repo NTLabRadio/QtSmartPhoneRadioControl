@@ -26,7 +26,8 @@ MainWindow::MainWindow(QWidget *parent) :
     //Создаем объект для работы с SLIP-интерфейсом
     objSLIPInterface = new SLIPInterface;
 
-    ui->SLIPPayloadFormatError_label->setText("");
+    ui->SLIPTxStatus_label->setText("");
+    ui->SLIPRxStatus_label->setText("");
 }
 
 MainWindow::~MainWindow()
@@ -286,26 +287,35 @@ bool MainWindow::ConvertHexIntToUTF8(quint8* pBufData, quint16 nSizeData)
     return 1;
 }
 
+
+bool MainWindow::ConvertHexIntToUTF8(quint8* pBufData, quint16 nSizeData, QString& strMes)
+{
+    for (quint16 r = 0; r < nSizeData; r++)
+        strMes += QString::number((uchar)pBufData[r], 16).toUpper() + " ";
+}
+
+
 void MainWindow::on_pushButton_clicked()
 {
     QByteArray baDataForSend;
+    QString strMes;
 
     //Определяем размер полезных данных для передачи
-    nSLIPPayloadSize = ui->SLIPPayload_lineEdit->text().length();
+    nSLIPPayloadSize = ui->SLIPTxPayload_lineEdit->text().length();
 
     //Читаем строку, из которой надо сформировать SLIP-пакет, записываем в pSLIPPayloadData в UTF8-формате
     //Строка должна содержать только hex-символы ('0'-'9','A'-'F','a'-'f')
-    memcpy(pSLIPPayloadData, ui->SLIPPayload_lineEdit->text().toUtf8().data(), nSLIPPayloadSize);
+    memcpy(pSLIPPayloadData, ui->SLIPTxPayload_lineEdit->text().toUtf8().data(), nSLIPPayloadSize);
 
     //Преобразуем строку в масcив чисел 0-F
     if(!ConvertUTF8ToHexInt(pSLIPPayloadData,nSLIPPayloadSize))
     {
         //Ошибка при разборе сообщения для передачи. Выходим из функции, сообщаем пользователю об ошибке
-        ui->SLIPPayloadFormatError_label->setText("Неверный формат данных! Строка должна состоять из четного числа символов\n и содержать только hex-символы (0-9,A-F,a-f)");
+        ui->SLIPTxStatus_label->setText("Неверный формат данных! Строка должна состоять из четного числа символов\n и содержать только hex-символы (0-9,A-F,a-f)");
         return;
     }
     else
-        ui->SLIPPayloadFormatError_label->setText("");
+        ui->SLIPTxStatus_label->setText("");
 
     memset(pSLIPPackData,0,MAX_SIZE_OF_SLIP_PACK);
 
@@ -316,7 +326,7 @@ void MainWindow::on_pushButton_clicked()
     //Проверяем, подключено ли устройство
     if(!RadioDevice->isConnected())
     {
-        ui->SLIPPayloadFormatError_label->setText("Данные не могут быть переданы. Устройство не подключено");
+        ui->SLIPTxStatus_label->setText("Данные не могут быть переданы. Устройство не подключено");
         return;
     }
 
@@ -326,12 +336,23 @@ void MainWindow::on_pushButton_clicked()
     RadioDevice->SendDataToPort(baDataForSend);
 
 
-
     //Преобразуем массив чисел в строку из hex-символов ('0'-'9','A'-'F')
-    ConvertHexIntToUTF8(pSLIPPackData,nSLIPPackSize);
+    ConvertHexIntToUTF8(pSLIPPackData,nSLIPPackSize,strMes);
 
     //Показываем пользователю данные, которые переданы в порт
-    ui->SLIPPack_lineEdit->setText ((const char*)pSLIPPackData);
+    ui->SLIPTxData_lineEdit->setText (strMes);
 
+}
+
+
+void MainWindow::ReceiveDataFromRadioModule(QByteArray baRcvdData)
+{
+    QString strMes;
+
+    //Преобразуем принятые бинарные данные в строку из hex-символов ('0'-'9','A'-'F') для отображения
+    ConvertHexIntToUTF8((quint8*)baRcvdData.data(), baRcvdData.size(), strMes);
+
+    //Показываем пользователю данные, принятые из порта
+    ui->SLIPRxData_lineEdit->setText (strMes);
 
 }
