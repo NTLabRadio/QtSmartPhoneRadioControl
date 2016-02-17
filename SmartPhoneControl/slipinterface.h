@@ -13,6 +13,16 @@
 #include <stdint.h>
 #include <limits.h>
 
+#define TEST_CMX7262_WAV_EXCHANGE_THROUGH_UART
+
+#ifdef TEST_CMX7262_WAV_EXCHANGE_THROUGH_UART
+#define MAX_SIZE_OF_SLIP_PACK_PAYLOAD   (160)
+#else
+//Максимальный размер полезной нагрузки SLIP-пакетов
+#define MAX_SIZE_OF_SLIP_PACK_PAYLOAD	(128+4)		// В соответствие с межмодульным протоколом SPIM (Smart Phone InterModule)
+                                                                                        // - максимальная длина полезных данных - 128 байт;
+                                                                                        // - размер служебных данных в пакете (заголовок, CRC) - 4 байта
+#endif
 
 class SLIPInterface
 {
@@ -36,10 +46,6 @@ private:
 	//Возможные результаты выполнения функций
 	#define RES_SUCCESS     (0)
 	#define RES_FAIL        (UCHAR_MAX)
-
-	#define MAX_SIZE_OF_SLIP_PACK_PAYLOAD	(128+4)		// В соответствие с межмодульным протоколом SPIM (Smart Phone InterModule) 
-																									// - максимальная длина полезных данных - 128 байт;
-																									// - размер служебных данных в пакете (заголовок, CRC) - 4 байта
 
 	//Размер буфера для накопления данных интерфейсом SLIP, анализирующим поток данных побайтно
 	#define SIZE_BUF_FOR_SLIP_DATA	(2*MAX_SIZE_OF_SLIP_PACK_PAYLOAD + 2)	// SLIP операцией байт-стафинга может увеличивать размер данных в 2 раза + 2 символа FEND

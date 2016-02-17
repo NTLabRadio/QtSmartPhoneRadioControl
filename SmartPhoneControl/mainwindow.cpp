@@ -28,6 +28,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->SLIPTxStatus_label->setText("");
     ui->SLIPRxStatus_label->setText("");
+    ui->SLIPFileTxStatus_label->setText("");
+
+    InitWavSendTimer();
 }
 
 MainWindow::~MainWindow()
@@ -170,11 +173,11 @@ void MainWindow::CheckCOMDevices()
     }
 }
 
-#define MAX_SIZE_OF_SLIP_PAYLOAD    (128+4)
-quint8 pSLIPPayloadData[128+4];
+
+quint8 pSLIPPayloadData[MAX_SIZE_OF_SLIP_PACK_PAYLOAD];
 quint16 nSLIPPayloadSize = 0;
 
-#define MAX_SIZE_OF_SLIP_PACK   (2*MAX_SIZE_OF_SLIP_PAYLOAD)
+#define MAX_SIZE_OF_SLIP_PACK   (2*MAX_SIZE_OF_SLIP_PACK_PAYLOAD)
 quint8 pSLIPPackData[MAX_SIZE_OF_SLIP_PACK];
 quint16 nSLIPPackSize = 0;
 
@@ -240,62 +243,16 @@ bool MainWindow::ConvertUTF8ToHexInt(quint8* pBufData,quint16 nSizeData)
 }
 
 
-bool MainWindow::ConvertHexIntToUTF8(quint8* pBufData, quint16 nSizeData)
+bool MainWindow::ConvertHexIntToUTF8(quint8* pBufData, quint16 nSizeData, QString& strMes)
 {
-    qint16 cntBytes;
-    quint8 nByteHighValue, nByteLowValue;
-
-    nSizeData*=2;
-
-    for(cntBytes=nSizeData/2-1; cntBytes>=0; cntBytes--)
-    {
-        #ifdef QDEBUG_CONVERT_HEX_UTF8
-        qDebug() << "pBufData[" << cntBytes << "] =" << pBufData[cntBytes];
-        #endif
-
-        nByteHighValue = (pBufData[cntBytes]&0xF0)>>4;
-        nByteLowValue = pBufData[cntBytes]&0x0F;
-
-        #ifdef QDEBUG_CONVERT_HEX_UTF8
-        qDebug() << "hex[" << cntBytes << "]&0xF0>>4 =" << nByteLowValue;
-        qDebug() << "hex[" << cntBytes << "]*0x0F  =" << nByteHighValue;
-        #endif
-
-        if(nByteLowValue <= 0x9)
-            pBufData[2*cntBytes+1] = nByteLowValue + 0x30;
-        else if((nByteLowValue >= 0xA) && (nByteLowValue <= 0xF))
-            pBufData[2*cntBytes+1] = nByteLowValue + 0x37;
-        else
-            return 0;
-
-        #ifdef QDEBUG_CONVERT_HEX_UTF8
-        qDebug() << "char[" << 2*cntBytes+1 << "] =" << pBufData[2*cntBytes+1];
-        #endif
-
-        if(nByteHighValue <= 0x9)
-            pBufData[2*cntBytes] = nByteHighValue + 0x30;
-        else if((nByteHighValue >= 0xA) && (nByteHighValue <= 0xF))
-            pBufData[2*cntBytes] = nByteHighValue + 0x37;
-        else
-            return 0;
-
-        #ifdef QDEBUG_CONVERT_HEX_UTF8
-        qDebug() << "char[" << 2*cntBytes << "] =" << pBufData[2*cntBytes];
-        #endif
-    }
+    for (quint16 r = 0; r < nSizeData; r++)
+        strMes += QString::number((uchar)pBufData[r], 16).toUpper() + " ";
 
     return 1;
 }
 
 
-bool MainWindow::ConvertHexIntToUTF8(quint8* pBufData, quint16 nSizeData, QString& strMes)
-{
-    for (quint16 r = 0; r < nSizeData; r++)
-        strMes += QString::number((uchar)pBufData[r], 16).toUpper() + " ";
-}
-
-
-void MainWindow::on_pushButton_clicked()
+void MainWindow::on_SendTestData_Button_clicked()
 {
     QByteArray baDataForSend;
     QString strMes;
@@ -355,4 +312,157 @@ void MainWindow::ReceiveDataFromRadioModule(QByteArray baRcvdData)
     //Показываем пользователю данные, принятые из порта
     ui->SLIPRxData_lineEdit->setText (strMes);
 
+}
+
+
+void MainWindow::InitWavSendTimer()
+{
+    //Объект QTimer для периодической посылки звуковых данных на устройство для теста
+    timerWavSend = new QTimer(this);
+    connect(timerWavSend,SIGNAL(timeout()),this,SLOT(SendWavFrame()));
+    timerWavSend->setInterval(PERIOD_MS_WAV_FRAME_SEND);
+    timerWavSend->start();
+
+    return;
+}
+
+
+#define SIZE_OF_WAV_FRAME_SAMPLES (80)
+
+QString NameOfTestfFile;
+QFile TestFile;
+quint32 lSizeTestFile;
+quint32 lSizeTestFileRestToSend;
+QByteArray baDataTestFile;
+
+enum   enStateSendTestFile
+{
+    STATE_IDLE_FILE_SEND,
+    STATE_RUNNING_FILE_SEND,
+    STATE_END_FILE_SEND
+};
+
+enStateSendTestFile nStateSendTestFile = STATE_IDLE_FILE_SEND;
+
+
+void MainWindow::on_SendTestFile_Button_clicked()
+{
+    if(TestFile.fileName()=="")
+    {
+        ui->SLIPFileTxStatus_label->setText("Данные не могут быть переданы. Не выбран файл");
+        return;
+    }
+
+    if (!TestFile.open(QIODevice::ReadOnly))    //открываем его
+    {
+        qDebug() << "WARNING! Тестовый файл не может быть открыт";
+        ui->SLIPFileTxStatus_label->setText("Данные не могут быть переданы. Файл не может быть открыт");
+        return;
+    }
+
+    ui->SLIPFileTxStatus_label->setText("");
+
+    lSizeTestFile = TestFile.size();
+    lSizeTestFileRestToSend = lSizeTestFile;
+
+    baDataTestFile = TestFile.readAll();
+
+    TestFile.close();
+
+    nStateSendTestFile = STATE_RUNNING_FILE_SEND;
+}
+
+
+
+
+void MainWindow::SendWavFrame()
+{
+    QByteArray baDataForSend;
+
+    if(nStateSendTestFile==STATE_RUNNING_FILE_SEND)
+    {
+        //Проверяем, подключено ли устройство
+        if(!RadioDevice->isConnected())
+        {
+            ui->SLIPFileTxStatus_label->setText("Данные не могут быть переданы. Устройство не подключено");
+            nStateSendTestFile=STATE_IDLE_FILE_SEND;
+            return;
+        }
+
+        if(lSizeTestFileRestToSend)
+        {
+            if(lSizeTestFileRestToSend>sizeof(qint16)*SIZE_OF_WAV_FRAME_SAMPLES)
+                nSLIPPayloadSize = sizeof(qint16)*SIZE_OF_WAV_FRAME_SAMPLES;
+            else
+                nSLIPPayloadSize = (quint16)lSizeTestFileRestToSend;
+            memcpy(pSLIPPayloadData, baDataTestFile.data(), nSLIPPayloadSize);
+            baDataTestFile.remove(0,nSLIPPayloadSize);
+
+            lSizeTestFileRestToSend-=nSLIPPayloadSize;
+            ui->TestFileSend_progressBar->setValue(100*(lSizeTestFile-lSizeTestFileRestToSend)/lSizeTestFile);
+
+            memset(pSLIPPackData,0,MAX_SIZE_OF_SLIP_PACK);
+
+            //Формируем SLIP-пакет
+            objSLIPInterface->FormPack((uint8_t*)pSLIPPayloadData, (uint16_t)nSLIPPayloadSize, (uint8_t*)pSLIPPackData, (uint16_t&)nSLIPPackSize, 256);
+
+            baDataForSend.append((const char*)pSLIPPackData, nSLIPPackSize);
+
+            #ifdef DEBUG_LOG_SIZE_OF_UART_TX_PACK
+            qDebug() << "Передаем в порт SLIP-пакет размером" << nSLIPPackSize << "байт";
+            qDebug() << "Размер полезной нагрузки SLIP пакета:" << nSLIPPayloadSize << "байт";
+            #endif
+
+            //Передаем данные в порт
+            if(RadioDevice->SendDataToPort(baDataForSend))
+            {
+                ui->SLIPFileTxStatus_label->setText("Данные не могут быть переданы. Ошибка обмена с устройством");
+                SetTestFileSendProgressBarFail();
+            }
+        }
+        else
+        {
+            nStateSendTestFile=STATE_END_FILE_SEND;
+            SetTestFileSendProgressBarSuccess();
+        }
+    }
+
+}
+
+void MainWindow::on_TestFileTransfer_Button_clicked()
+{
+    NameOfTestfFile = QFileDialog::getOpenFileName(this);
+    QFileInfo finfo(NameOfTestfFile);
+    QString fileName = finfo.fileName();
+
+    lSizeTestFile = finfo.size();
+
+    if (NameOfTestfFile == "")
+    {
+         ui->SLIPFileTxStatus_label->setText("Файл не выбран");
+        return;
+    }
+    else
+        TestFile.setFileName(NameOfTestfFile);
+
+    ui->TestFileTransfer_lineEdit->setText(NameOfTestfFile);
+}
+
+
+
+void MainWindow::SetTestFileSendProgressBarFail()
+{
+    QPalette pal = ui->TestFileSend_progressBar->palette();
+    pal.setColor(QPalette::Highlight, QColor("red"));
+    ui->TestFileSend_progressBar->setPalette(pal);
+    ui->TestFileSend_progressBar->repaint();
+}
+
+void MainWindow::SetTestFileSendProgressBarSuccess()
+{
+    ui->TestFileSend_progressBar->setValue(100);
+    QPalette pal = ui->TestFileSend_progressBar->palette();
+    pal.setColor(QPalette::Highlight, QColor("green"));
+    ui->TestFileSend_progressBar->setPalette(pal);
+    ui->TestFileSend_progressBar->repaint();
 }
