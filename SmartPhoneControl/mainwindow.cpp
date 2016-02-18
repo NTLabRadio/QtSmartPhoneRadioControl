@@ -26,9 +26,13 @@ MainWindow::MainWindow(QWidget *parent) :
     //Создаем объект для работы с SLIP-интерфейсом
     objSLIPInterface = new SLIPInterface;
 
+    //Создаем объект для формирования сообщений SPIM протокола
+    objSPIMmsgTx = new SPIMMessage;
+
     ui->SLIPTxStatus_label->setText("");
     ui->SLIPRxStatus_label->setText("");
     ui->SLIPFileTxStatus_label->setText("");
+    ui->SPIMTxStatus_label->setText("");
 
     InitWavSendTimer();
 }
@@ -251,6 +255,27 @@ bool MainWindow::ConvertHexIntToUTF8(quint8* pBufData, quint16 nSizeData, QStrin
     return 1;
 }
 
+bool MainWindow::ConvertUTF8StringToHexInt(QString strMes, quint8* pHexData, quint16& nSizeData)
+{
+    bool ok;
+    QString fragmStrMes;
+
+    if(strMes.size()%2)
+        return(0);
+    else
+        nSizeData = strMes.size()/2;
+
+    for (quint16 r = 0; r < nSizeData; r++)
+    {
+        fragmStrMes = strMes.mid(2*r,2);
+        pHexData[r] = fragmStrMes.toInt(&ok, 16);
+
+        if(!ok)
+            return(0);
+    }
+
+    return(1);
+}
 
 void MainWindow::on_SendTestData_Button_clicked()
 {
@@ -465,4 +490,92 @@ void MainWindow::SetTestFileSendProgressBarSuccess()
     pal.setColor(QPalette::Highlight, QColor("green"));
     ui->TestFileSend_progressBar->setPalette(pal);
     ui->TestFileSend_progressBar->repaint();
+}
+
+
+#define MAX_SIZE_OF_SPIM_BODY       (128)
+
+
+void MainWindow::on_SendSPIMData_Button_clicked()
+{
+    bool ok;
+
+    uint8_t pBodyData[MAX_SIZE_OF_SPIM_BODY];   //Данные тела сообщения SPIM
+    uint16_t nBodySize;         //Размер тела сообщения SPIM
+
+    //Читаем строку, из которой надо сформировать тело сообщения
+    //Строка должна содержать только hex-символы ('0'-'9','A'-'F','a'-'f')
+    if(!ConvertUTF8StringToHexInt(ui->SPIM_DATA_lineEdit->text(), pBodyData, nBodySize))
+    {
+        ui->SPIMTxStatus_label->setText("Неверный формат данных! Строка должна состоять из четного числа символов\n и содержать только hex-символы (0-9,A-F,a-f)");
+        return;
+    }
+    else
+        ui->SPIMTxStatus_label->setText("");
+
+    if(nBodySize > MAX_SIZE_OF_SPIM_BODY)
+    {
+        ui->SPIMTxStatus_label->setText("Размер тела сообщения превышает максимально допустимое знаение");
+        return;
+    }
+
+    //Отображаем для пользователя значение поля LEN, соответствующее размеру тела сообщения SPIM
+     ui->SPIM_LEN_lineEdit->setText(QString::number(nBodySize,16).toUpper());
+
+    //Определяем адресата сообщения SPIM
+    uint8_t nAddress = ui->SPIM_ADR_lineEdit->text().toInt(&ok, 16);
+    if(!ok)
+    {
+        ui->SPIMTxStatus_label->setText("Некорректный формат поля ADR");
+        return;
+    }
+
+    //Определяем порядковый номер сообщения SPIM
+    uint8_t nNoMsg = ui->SPIM_NO_lineEdit->text().toInt(&ok, 16);
+    if(!ok)
+    {
+        ui->SPIMTxStatus_label->setText("Некорректный формат поля NO");
+        return;
+    }
+
+    //Определяем идентификатор команды сообщения SPIM
+    uint8_t nIDcmd = ui->SPIM_ID_lineEdit->text().toInt(&ok, 16);
+    if(!ok)
+    {
+        ui->SPIMTxStatus_label->setText("Некорректный формат поля ID");
+        return;
+    }
+
+    //Составляем заголовок сообщения
+    objSPIMmsgTx->setHeader(nBodySize,nAddress,nNoMsg,nIDcmd);
+
+    //Вставляем в сообщение тело
+    objSPIMmsgTx->setBody(pBodyData,nBodySize);
+
+    //Расчитываем и вставляем в сообщение контрольную сумму
+    objSPIMmsgTx->setCRC();
+
+    uint8_t nCRC = objSPIMmsgTx->getCRC();
+    ui->SPIM_CRC_lineEdit->setText(QString::number(nCRC,16).toUpper());
+
+
+    //Проверяем, подключено ли устройство
+    if(!RadioDevice->isConnected())
+    {
+        ui->SPIMTxStatus_label->setText("Данные не могут быть переданы. Устройство не подключено");
+        return;
+    }
+
+    memset(pSLIPPackData,0,MAX_SIZE_OF_SLIP_PACK);
+
+    //Формируем SLIP-пакет
+    objSLIPInterface->FormPack((uint8_t*)objSPIMmsgTx->Data, (uint16_t)objSPIMmsgTx->Size, (uint8_t*)pSLIPPackData, (uint16_t&)nSLIPPackSize, 256);
+
+    QByteArray baDataForSend;
+    baDataForSend.append((const char*)pSLIPPackData, nSLIPPackSize);
+
+    //Передаем данные в порт
+    RadioDevice->SendDataToPort(baDataForSend);
+
+
 }
