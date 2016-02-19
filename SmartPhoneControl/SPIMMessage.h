@@ -25,6 +25,8 @@ public:
     uint8_t* Data;
     uint8_t Size;
 
+    uint8_t* Body;
+
     uint8_t setHeader(uint8_t bodySize, uint8_t address, uint8_t noMsg, uint8_t IDcmd);
     uint8_t setBody(uint8_t* pBodyData, uint8_t bodySize);
     uint8_t setCRC();

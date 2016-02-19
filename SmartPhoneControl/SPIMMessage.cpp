@@ -17,6 +17,7 @@ SPIMMessage::SPIMMessage()
     SPIMCRC = SPIMmsgData + SIZE_OF_HEADER;
 
     Data = SPIMmsgData;
+    Body = SPIMbodyData;
 }
 
 
@@ -44,6 +45,7 @@ SPIMMessage::SPIMMessage(const uint8_t* pMsgData, uint16_t msgSize)
     SPIMCRC = SPIMmsgData + SIZE_OF_HEADER + SPIMbodySize;
 
     Data = SPIMmsgData;
+    Body = SPIMbodyData;
 
     return;
 }

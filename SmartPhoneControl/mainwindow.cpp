@@ -1,6 +1,9 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+#define DEBUG_SHOW_RCVD_SPIM_MSG
+
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -33,6 +36,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->SLIPRxStatus_label->setText("");
     ui->SLIPFileTxStatus_label->setText("");
     ui->SPIMTxStatus_label->setText("");
+    ui->SPIMRxStatus_label->setText("");
 
     InitWavSendTimer();
 }
@@ -42,6 +46,8 @@ MainWindow::~MainWindow()
     delete RadioDevice;
     delete timerPollingCOMDevices;
     delete mnConnectDeviceSubMenu;
+    delete objSLIPInterface;
+    delete objSPIMmsgTx;
     delete ui;
 }
 
@@ -329,6 +335,37 @@ void MainWindow::on_SendTestData_Button_clicked()
 
 void MainWindow::ReceiveDataFromRadioModule(QByteArray baRcvdData)
 {
+    #ifdef DEBUG_SHOW_RCVD_SLIP_PACK
+    ShowRcvdSLIPPack(QByteArray baRcvdData);
+    #endif
+
+    uint8_t* pSPIMmsgData;
+    uint16_t SPIMmsgSize;
+    uint16_t nPosEndOfSLIPPack;
+
+    //Создаем сообщение SPIM протокола
+    SPIMMessage SPIMBackCmd;
+
+    //Получаем указатель на данные сообщения
+    pSPIMmsgData = SPIMBackCmd.Data;
+
+    //Ищем в принятых данных SLIP-пакет.
+    if(objSLIPInterface->FindPackInData((uint8_t*)baRcvdData.data(), (uint16_t)baRcvdData.size(), pSPIMmsgData, SPIMmsgSize, nPosEndOfSLIPPack)!=2)
+        return;
+
+    //Если найден SLIP пакет, записываем его полезные данные в SPIM сообщение
+    SPIMBackCmd.setMsg(pSPIMmsgData,SPIMmsgSize);
+
+    #ifdef DEBUG_SHOW_RCVD_SPIM_MSG
+    ShowRcvdSPIMMsg(SPIMBackCmd);
+    #endif
+
+
+}
+
+
+void MainWindow::ShowRcvdSLIPPack(QByteArray baRcvdData)
+{
     QString strMes;
 
     //Преобразуем принятые бинарные данные в строку из hex-символов ('0'-'9','A'-'F') для отображения
@@ -336,7 +373,37 @@ void MainWindow::ReceiveDataFromRadioModule(QByteArray baRcvdData)
 
     //Показываем пользователю данные, принятые из порта
     ui->SLIPRxData_lineEdit->setText (strMes);
+}
 
+
+void MainWindow::ShowRcvdSPIMMsg(SPIMMessage RcvdSPIMMsg)
+{
+    uint8_t bodySize = RcvdSPIMMsg.getSizeBody();
+    ui->SPIM_RX_LEN_lineEdit->setText(QString::number(bodySize,16).toUpper());
+
+    uint8_t address = RcvdSPIMMsg.getAddress();
+    ui->SPIM_RX_ADR_lineEdit->setText(QString::number(address,16).toUpper());
+
+    uint8_t noMsg = RcvdSPIMMsg.getNoMsg();
+    ui->SPIM_RX_NO_lineEdit->setText(QString::number(noMsg,16).toUpper());
+
+    uint8_t IDcmd = RcvdSPIMMsg.getIDCmd();
+    ui->SPIM_RX_ID_lineEdit->setText(QString::number(IDcmd,16).toUpper());
+
+    uint8_t* pSPIMbodyData;
+    pSPIMbodyData = RcvdSPIMMsg.Body;
+    ui->SPIM_RX_DATA_lineEdit->setText(QString((QChar*)pSPIMbodyData,bodySize));
+
+    uint8_t CRCmsg = RcvdSPIMMsg.getCRC();
+    ui->SPIM_RX_CRC_lineEdit->setText(QString::number(CRCmsg,16).toUpper());
+
+    QPalette palCRClabel = ui->SPIM_RX_CRC_label->palette();
+    if(RcvdSPIMMsg.checkCRC())        
+        //CRC верна. Раскрашиваем CRC_label зеленым цветом
+        palCRClabel.setColor(QPalette::WindowText, QColor("green"));
+    else
+        //CRC не верна. Раскрашиваем CRC_label красным цветом
+        palCRClabel.setColor(QPalette::WindowText, QColor("red"));
 }
 
 

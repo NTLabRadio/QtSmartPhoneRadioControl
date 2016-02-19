@@ -69,6 +69,9 @@ private:
     void SetTestFileSendProgressBarFail();
     void SetTestFileSendProgressBarSuccess();
 
+    void ShowRcvdSLIPPack(QByteArray baRcvdData);
+    void ShowRcvdSPIMMsg(SPIMMessage SPIMBackCmd);
+
 #define PERIOD_MS_POLLING_COM_DEVICES (1000)   //период опроса COM-устройств с целью отслеживания их присутствия в системе, мс
 QTimer *timerPollingCOMDevices;                 // Таймер для периодического контроля подключения/отключения устройств
     void InitPollingCOMDevices();
