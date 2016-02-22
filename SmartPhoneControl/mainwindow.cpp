@@ -392,7 +392,10 @@ void MainWindow::ShowRcvdSPIMMsg(SPIMMessage RcvdSPIMMsg)
 
     uint8_t* pSPIMbodyData;
     pSPIMbodyData = RcvdSPIMMsg.Body;
-    ui->SPIM_RX_DATA_lineEdit->setText(QString((QChar*)pSPIMbodyData,bodySize));
+    QString strSPIMbodyHexData;
+
+    ConvertHexIntToUTF8(pSPIMbodyData, bodySize, strSPIMbodyHexData);
+    ui->SPIM_RX_DATA_lineEdit->setText(strSPIMbodyHexData);
 
     uint8_t CRCmsg = RcvdSPIMMsg.getCRC();
     ui->SPIM_RX_CRC_lineEdit->setText(QString::number(CRCmsg,16).toUpper());
