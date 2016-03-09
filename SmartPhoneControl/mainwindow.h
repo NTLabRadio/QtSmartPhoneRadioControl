@@ -7,6 +7,7 @@
 #include <QFileDialog>
 #include <QtSerialPort/QSerialPortInfo>
 
+#include "QFileTransfer.h"
 #include "qSmartRadioModuleControl.h"
 #include "slipinterface.h"
 #include "SPIMMessage.h"
@@ -31,6 +32,9 @@ public slots:
     quint8 CloseConnectedDevice();
     void ConnectCOMDevice();
 
+signals:
+    void signalSendNextFilePack(QSmartRadioModuleControl*);
+
 private slots:
     void ShowAvailPortsInMenu();
 
@@ -46,9 +50,15 @@ private slots:
 
     void on_SendSPIMData_Button_clicked();
 
+    void on_FileTransfer_Button_clicked();
+
+    void on_SendFile_Button_clicked();
+
+    void SendFilePackToTransceiver();
+
 private:
-#define DE9943_PRODUCT_ID          (0x0585)             //ID продукта макетной платы радиоблока
-#define DE9943_VENDOR_ID            (0x1747)             //ID производителя макетной платы радиоблока
+    static const quint16  DE9943_PRODUCT_ID = 0x0585;           //ID продукта макетной платы радиоблока
+    static const quint16  DE9943_VENDOR_ID = 0x1747;             //ID производителя макетной платы радиоблока
 
     Ui::MainWindow *ui;
 
@@ -72,13 +82,35 @@ private:
     void ShowRcvdSLIPPack(QByteArray baRcvdData);
     void ShowRcvdSPIMMsg(SPIMMessage SPIMBackCmd);
 
-#define PERIOD_MS_POLLING_COM_DEVICES (1000)   //период опроса COM-устройств с целью отслеживания их присутствия в системе, мс
-QTimer *timerPollingCOMDevices;                 // Таймер для периодического контроля подключения/отключения устройств
+    static const quint16  PERIOD_MS_POLLING_COM_DEVICES  = 1000;   //период опроса COM-устройств с целью отслеживания их присутствия в системе, мс
+    QTimer *timerPollingCOMDevices;                 // Таймер для периодического контроля подключения/отключения устройств
     void InitPollingCOMDevices();
 
-#define PERIOD_MS_WAV_FRAME_SEND    (10)    //период посылки звуковых данных на устройство
-QTimer *timerWavSend;                               // Таймер для периодической посылки звуковых данных на устройство
+    static const quint16 PERIOD_MS_WAV_FRAME_SEND = 10;    //период посылки звуковых данных на устройство
+    QTimer *timerWavSend;                               // Таймер для периодической посылки звуковых данных на устройство
     void InitWavSendTimer();
+
+    enum   enStateSendFile
+    {
+        STATE_IDLE_FILE_SEND,
+        STATE_RUNNING_FILE_SEND,
+        STATE_END_FILE_SEND
+    };
+
+    static const quint16 SIZE_OF_WAV_FRAME_SAMPLES = 80;
+
+    QString NameOfTestfFile;
+    QFile TestFile;
+    quint32 lSizeTestFile;
+    quint32 lSizeTestFileRestToSend;
+    QByteArray baDataTestFile;
+
+    enStateSendFile nStateSendTestFile = STATE_IDLE_FILE_SEND;
+
+    QFileTransfer FileTransmitter;
+
+    void ShowFileTxError(QString strError);
+    void ClearFileTxError();
 };
 
 #endif // MAINWINDOW_H

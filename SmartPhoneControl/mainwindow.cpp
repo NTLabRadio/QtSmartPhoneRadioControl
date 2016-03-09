@@ -26,11 +26,12 @@ MainWindow::MainWindow(QWidget *parent) :
     // Обработка данных, принятых от устройства
     connect(RadioDevice, SIGNAL(signalReceiveData(QByteArray)),this, SLOT(ReceiveDataFromRadioModule(QByteArray)));
 
-    //Создаем объект для работы с SLIP-интерфейсом
-    objSLIPInterface = new SLIPInterface;
+    connect(this, SIGNAL(signalSendNextFilePack(QSmartRadioModuleControl*)),&FileTransmitter, SLOT(slotSendDataPack(QSmartRadioModuleControl*)));
 
     //Создаем объект для формирования сообщений SPIM протокола
     objSPIMmsgTx = new SPIMMessage;
+
+    ui->FileTxStatus_label->setText("");
 
     ui->SLIPTxStatus_label->setText("");
     ui->SLIPRxStatus_label->setText("");
@@ -46,7 +47,6 @@ MainWindow::~MainWindow()
     delete RadioDevice;
     delete timerPollingCOMDevices;
     delete mnConnectDeviceSubMenu;
-    delete objSLIPInterface;
     delete objSPIMmsgTx;
     delete ui;
 }
@@ -308,7 +308,7 @@ void MainWindow::on_SendTestData_Button_clicked()
     memset(pSLIPPackData,0,MAX_SIZE_OF_SLIP_PACK);
 
     //Формируем SLIP-пакет
-    objSLIPInterface->FormPack((uint8_t*)pSLIPPayloadData, (uint16_t)nSLIPPayloadSize/2, (uint8_t*)pSLIPPackData, (uint16_t&)nSLIPPackSize, 256);
+    SLIPInterface::FormPack((uint8_t*)pSLIPPayloadData, (uint16_t)nSLIPPayloadSize/2, (uint8_t*)pSLIPPackData, (uint16_t&)nSLIPPackSize, 256);
 
 
     //Проверяем, подключено ли устройство
@@ -350,7 +350,7 @@ void MainWindow::ReceiveDataFromRadioModule(QByteArray baRcvdData)
     pSPIMmsgData = SPIMBackCmd.Data;
 
     //Ищем в принятых данных SLIP-пакет.
-    if(objSLIPInterface->FindPackInData((uint8_t*)baRcvdData.data(), (uint16_t)baRcvdData.size(), pSPIMmsgData, SPIMmsgSize, nPosEndOfSLIPPack)!=2)
+    if(SLIPInterface::FindPackInData((uint8_t*)baRcvdData.data(), (uint16_t)baRcvdData.size(), pSPIMmsgData, SPIMmsgSize, nPosEndOfSLIPPack)!=2)
         return;
 
     //Если найден SLIP пакет, записываем его полезные данные в SPIM сообщение
@@ -422,23 +422,6 @@ void MainWindow::InitWavSendTimer()
 }
 
 
-#define SIZE_OF_WAV_FRAME_SAMPLES (80)
-
-QString NameOfTestfFile;
-QFile TestFile;
-quint32 lSizeTestFile;
-quint32 lSizeTestFileRestToSend;
-QByteArray baDataTestFile;
-
-enum   enStateSendTestFile
-{
-    STATE_IDLE_FILE_SEND,
-    STATE_RUNNING_FILE_SEND,
-    STATE_END_FILE_SEND
-};
-
-enStateSendTestFile nStateSendTestFile = STATE_IDLE_FILE_SEND;
-
 
 void MainWindow::on_SendTestFile_Button_clicked()
 {
@@ -499,7 +482,7 @@ void MainWindow::SendWavFrame()
             memset(pSLIPPackData,0,MAX_SIZE_OF_SLIP_PACK);
 
             //Формируем SLIP-пакет
-            objSLIPInterface->FormPack((uint8_t*)pSLIPPayloadData, (uint16_t)nSLIPPayloadSize, (uint8_t*)pSLIPPackData, (uint16_t&)nSLIPPackSize, 256);
+            SLIPInterface::FormPack((uint8_t*)pSLIPPayloadData, (uint16_t)nSLIPPayloadSize, (uint8_t*)pSLIPPackData, (uint16_t&)nSLIPPackSize, 256);
 
             baDataForSend.append((const char*)pSLIPPackData, nSLIPPackSize);
 
@@ -639,7 +622,7 @@ void MainWindow::on_SendSPIMData_Button_clicked()
     memset(pSLIPPackData,0,MAX_SIZE_OF_SLIP_PACK);
 
     //Формируем SLIP-пакет
-    objSLIPInterface->FormPack((uint8_t*)objSPIMmsgTx->Data, (uint16_t)objSPIMmsgTx->Size, (uint8_t*)pSLIPPackData, (uint16_t&)nSLIPPackSize, 256);
+    SLIPInterface::FormPack((uint8_t*)objSPIMmsgTx->Data, (uint16_t)objSPIMmsgTx->Size, (uint8_t*)pSLIPPackData, (uint16_t&)nSLIPPackSize, 256);
 
     QByteArray baDataForSend;
     baDataForSend.append((const char*)pSLIPPackData, nSLIPPackSize);
@@ -648,4 +631,73 @@ void MainWindow::on_SendSPIMData_Button_clicked()
     RadioDevice->SendDataToPort(baDataForSend);
 
 
+}
+
+void MainWindow::on_FileTransfer_Button_clicked()
+{
+    QString NameOfFileForSend = QFileDialog::getOpenFileName(this);
+
+    if(NameOfFileForSend == "")
+    {
+         ShowFileTxError("Файл не выбран");
+        return;
+    }
+
+    ui->FileTransfer_lineEdit->setText(NameOfFileForSend);
+
+    if(!FileTransmitter.SetFileForSend(NameOfFileForSend))
+         ShowFileTxError("Файл не может быть открыт");
+    else
+       ClearFileTxError();
+}
+
+
+void MainWindow::on_SendFile_Button_clicked()
+{
+    if(FileTransmitter.GetFileName()=="")
+    {
+        ShowFileTxError("Данные не могут быть переданы. Не выбран файл");
+        return;
+    }
+
+    if(FileTransmitter.GetTransferStatus()==QFileTransfer::FILE_IS_READY_FOR_TX)
+        ClearFileTxError();
+    else
+    {
+        ShowFileTxError("Данные не могут быть переданы");
+        return;
+    }
+
+
+    //nStateSendFile = STATE_RUNNING_FILE_SEND;
+}
+
+
+void MainWindow::SendFilePackToTransceiver()
+{
+    //Проверяем, подключено ли устройство
+    if(!RadioDevice->isConnected())
+    {
+        ShowFileTxError("Данные не могут быть переданы. Устройство не подключено");
+        return;
+    }
+
+    if(FileTransmitter.GetTransferStatus()==QFileTransfer::DEVICE_EXCHANGE_FAIL)
+    {
+        ShowFileTxError("Данные не могут быть переданы. Ошибка обмена с устройством");
+    }
+
+    emit signalSendNextFilePack(RadioDevice);
+
+    //ui->FileSend_progressBar->setValue(100*(lSizeFileForSend-lSizeFileRestToSend)/lSizeFileForSend);
+}
+
+void MainWindow::ShowFileTxError(QString strError)
+{
+    ui->FileTxStatus_label->setText(strError);
+}
+
+void MainWindow::ClearFileTxError()
+{
+    ui->FileTxStatus_label->setText("");
 }

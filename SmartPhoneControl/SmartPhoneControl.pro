@@ -15,12 +15,15 @@ TEMPLATE = app
 SOURCES += main.cpp\
         mainwindow.cpp \
     qSmartRadioModuleControl.cpp \
-    slipinterface.cpp \
-    SPIMMessage.cpp
+    SPIMMessage.cpp \
+    QFileTransfer.cpp \
+    SLIPinterface.cpp
 
 HEADERS  += mainwindow.h \
     qSmartRadioModuleControl.h \
-    slipinterface.h \
-    SPIMMessage.h
+    SPIMMessage.h \
+    ../QFileTransfer.h \
+    QFileTransfer.h \
+    SLIPinterface.h
 
 FORMS    += mainwindow.ui
