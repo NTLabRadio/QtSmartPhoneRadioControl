@@ -56,6 +56,8 @@ private slots:
 
     void SendFilePackToTransceiver();
 
+    void CheckFileTransferStatus();
+
 private:
     static const quint16  DE9943_PRODUCT_ID = 0x0585;           //ID продукта макетной платы радиоблока
     static const quint16  DE9943_VENDOR_ID = 0x1747;             //ID производителя макетной платы радиоблока
@@ -105,12 +107,27 @@ private:
     quint32 lSizeTestFileRestToSend;
     QByteArray baDataTestFile;
 
-    enStateSendFile nStateSendTestFile = STATE_IDLE_FILE_SEND;
+    enStateSendFile nStateSendTestFile;
 
     QFileTransfer FileTransmitter;
 
     void ShowFileTxError(QString strError);
     void ClearFileTxError();
+
+    // Таймер периодического контроля процесса передачи файла на устройство
+    QTimer *timerFileSend =  NULL;
+    //Период проверки состояния радиомодуля в процессе передачи файла на устройство
+    static const quint16 PERIOD_MS_CHECK_FILE_SEND_STATUS = 100;
+
+    quint32 timeTransmitterBusyMs;
+
+    void InitFileSendTimer();
+    void DeinitFileSendTimer();
+
+    void SetFileSendProgressBarFail();
+    void SetFileSendProgressBarSuccess();
+
+    void ShowFileSendErrorStatus();
 };
 
 #endif // MAINWINDOW_H

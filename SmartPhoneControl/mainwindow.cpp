@@ -10,7 +10,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    this->setWindowTitle("SmartPhoneControl ver 1.0");
+    this->setWindowTitle("SmartPhoneControl ver 1.1");
 
     RadioDevice = new QSmartRadioModuleControl;
 
@@ -40,6 +40,11 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->SPIMRxStatus_label->setText("");
 
     InitWavSendTimer();
+
+    nStateSendTestFile = STATE_IDLE_FILE_SEND;
+
+    timeTransmitterBusyMs = 0;
+
 }
 
 MainWindow::~MainWindow()
@@ -546,14 +551,11 @@ void MainWindow::SetTestFileSendProgressBarSuccess()
 }
 
 
-#define MAX_SIZE_OF_SPIM_BODY       (128)
-
-
 void MainWindow::on_SendSPIMData_Button_clicked()
 {
     bool ok;
 
-    uint8_t pBodyData[MAX_SIZE_OF_SPIM_BODY];   //Данные тела сообщения SPIM
+    uint8_t pBodyData[SPIMMessage::MAX_SIZE_OF_BODY];   //Данные тела сообщения SPIM
     uint16_t nBodySize;         //Размер тела сообщения SPIM
 
     //Читаем строку, из которой надо сформировать тело сообщения
@@ -566,7 +568,7 @@ void MainWindow::on_SendSPIMData_Button_clicked()
     else
         ui->SPIMTxStatus_label->setText("");
 
-    if(nBodySize > MAX_SIZE_OF_SPIM_BODY)
+    if(nBodySize > SPIMMessage::MAX_SIZE_OF_BODY)
     {
         ui->SPIMTxStatus_label->setText("Размер тела сообщения превышает максимально допустимое знаение");
         return;
@@ -633,6 +635,9 @@ void MainWindow::on_SendSPIMData_Button_clicked()
 
 }
 
+/**
+   * @brief  Обработка нажатия на кнопку "..." выбора файла для передачи
+   */
 void MainWindow::on_FileTransfer_Button_clicked()
 {
     QString NameOfFileForSend = QFileDialog::getOpenFileName(this);
@@ -646,58 +651,193 @@ void MainWindow::on_FileTransfer_Button_clicked()
     ui->FileTransfer_lineEdit->setText(NameOfFileForSend);
 
     if(!FileTransmitter.SetFileForSend(NameOfFileForSend))
-         ShowFileTxError("Файл не может быть открыт");
+    {
+        switch(FileTransmitter.GetErrorStatus())
+        {
+            case QFileTransfer::ERROR_FILE_OPEN:
+                ShowFileTxError("Файл не может быть передан. Ошибка открытия файла");
+                break;
+            case QFileTransfer::ERROR_FILE_SIZE_IS_TOO_BIG:
+                ShowFileTxError("Файл не может быть передан. Превышен максимальный размер файла");
+                break;
+        }
+    }
     else
        ClearFileTxError();
 }
 
 
+/**
+   * @brief  Обработка нажатия на кнопку "Передать файл"
+   */
 void MainWindow::on_SendFile_Button_clicked()
 {
-    if(FileTransmitter.GetFileName()=="")
+    switch(FileTransmitter.GetTransferStatus())
     {
-        ShowFileTxError("Данные не могут быть переданы. Не выбран файл");
+        case QFileTransfer::FILE_IS_READY_FOR_SEND:
+            ClearFileTxError();
+            //Стартуем таймер, контролирующий процесс передачи файла
+            InitFileSendTimer();
+            break;
+        case QFileTransfer::FILE_IS_IN_SEND_PROCESS:
+            ShowFileTxError("Этот файл уже передается");
+            break;
+        case QFileTransfer::FILE_IS_SENDED:
+            FileTransmitter.ResetFileForSend();
+
+            ClearFileTxError();
+            //Стартуем таймер, контролирующий процесс передачи файла
+            InitFileSendTimer();
+            break;
+        case QFileTransfer::FILE_SEND_DENY:
+            ShowFileSendErrorStatus();
+            break;
+    }
+
+}
+
+
+void MainWindow::InitFileSendTimer()
+{
+    if(!timerFileSend)
+    {
+        timerFileSend = new QTimer(this);
+        connect(timerFileSend,SIGNAL(timeout()),this,SLOT(CheckFileTransferStatus()));
+        timerFileSend->setInterval(PERIOD_MS_CHECK_FILE_SEND_STATUS);
+    }
+
+    timerFileSend->start();
+
+    return;
+}
+
+void MainWindow::DeinitFileSendTimer()
+{
+    timerFileSend->stop();
+    delete timerFileSend;
+    timerFileSend = NULL;
+}
+
+
+void MainWindow::CheckFileTransferStatus()
+{
+    //Если файл передан, убиваем таймер, рисуем зеленый ProgressBar
+    if(FileTransmitter.GetTransferStatus()==QFileTransfer::FILE_IS_SENDED)
+    {
+        DeinitFileSendTimer();
+        ShowFileTxError("Данные успешно переданы");
+        SetFileSendProgressBarSuccess();
         return;
     }
 
-    if(FileTransmitter.GetTransferStatus()==QFileTransfer::FILE_IS_READY_FOR_TX)
-        ClearFileTxError();
-    else
+    //Если возникло состояние критической ошибки интерфейса радиомодуля, то прекращаем передачу, убиваем таймер,
+    //рисуем красный ProgressBar
+    if(FileTransmitter.GetTransferStatus()==QFileTransfer::FILE_SEND_DENY)
     {
-        ShowFileTxError("Данные не могут быть переданы");
+        DeinitFileSendTimer();
+        ShowFileSendErrorStatus();
+        SetFileSendProgressBarFail();
         return;
     }
 
+#ifdef CHECK_TRANSMITTER_BUSY_IN_FILE_SENDING
+    //Если передатчик занят, ожидаем освобождения и возможности передать следующий пакет
+    if(FileTransmitter.GetTransmitterStatus()==QFileTransfer::TRANSMITTER_BUSY)
+    {
 
-    //nStateSendFile = STATE_RUNNING_FILE_SEND;
+        //Если очень долго не меняется состояние радимодуля, то прекращаем передачу, убиваем таймер,
+        //рисуем красный ProgressBar
+        if(timeTransmitterBusyMs > QFileTransfer::MAX_TIME_TRANSMITTER_BUSY_MS)
+        {
+            DeinitFileSendTimer();
+            ShowFileTxError("Данные не могут быть переданы. Передатчик слишком долго не отвечает");
+            SetFileSendProgressBarFail();
+            FileTransmitter.ResetFileForSend();
+        }
+        else
+            timeTransmitterBusyMs+=PERIOD_MS_CHECK_FILE_SEND_STATUS;
+
+        return;
+    }
+
+    timeTransmitterBusyMs = 0;
+#endif
+
+    //Поскольку передатчик освободился, значит, пакет был передан, изменился размер переданных данных - стоит
+    //перерисовать ProgressBar
+    ui->FileSend_progressBar->setValue(100 * FileTransmitter.GetSizeOfSendedFileData() / FileTransmitter.GetFileSize());
+
+    //Радимодуль свободен, можно ему послать следующий пакет данных для передачи в эфир
+    SendFilePackToTransceiver();
+
+    return;
 }
 
 
 void MainWindow::SendFilePackToTransceiver()
 {
-    //Проверяем, подключено ли устройство
-    if(!RadioDevice->isConnected())
-    {
-        ShowFileTxError("Данные не могут быть переданы. Устройство не подключено");
-        return;
-    }
-
-    if(FileTransmitter.GetTransferStatus()==QFileTransfer::DEVICE_EXCHANGE_FAIL)
-    {
-        ShowFileTxError("Данные не могут быть переданы. Ошибка обмена с устройством");
-    }
-
     emit signalSendNextFilePack(RadioDevice);
 
-    //ui->FileSend_progressBar->setValue(100*(lSizeFileForSend-lSizeFileRestToSend)/lSizeFileForSend);
+    FileTransmitter.SetTransmitterStatus(QFileTransfer::TRANSMITTER_BUSY);
 }
 
+/**
+   * @brief  Вывод в пользовательское окно ошибки передачи файла
+   */
 void MainWindow::ShowFileTxError(QString strError)
 {
     ui->FileTxStatus_label->setText(strError);
 }
 
+/**
+   * @brief  Очистка в пользовательском окне области ошибки передачи файла
+   */
 void MainWindow::ClearFileTxError()
 {
     ui->FileTxStatus_label->setText("");
+}
+
+/**
+   * @brief  Изменение состояния ProgressBar на состояние ошибки передачи
+   * (окрашивание статусной полоски в красный цвет)
+   */
+void MainWindow::SetFileSendProgressBarFail()
+{
+    QPalette pal = ui->FileSend_progressBar->palette();
+    pal.setColor(QPalette::Highlight, QColor("red"));
+    ui->FileSend_progressBar->setPalette(pal);
+    ui->FileSend_progressBar->repaint();
+}
+
+/**
+   * @brief  Изменение состояния ProgressBar на состояние успешной передачи
+   * (окрашивание статусной полоски в зеленый цвет)
+   */
+void MainWindow::SetFileSendProgressBarSuccess()
+{
+    ui->FileSend_progressBar->setValue(100);
+    QPalette pal = ui->FileSend_progressBar->palette();
+    pal.setColor(QPalette::Highlight, QColor("green"));
+    ui->FileSend_progressBar->setPalette(pal);
+    ui->FileSend_progressBar->repaint();
+}
+
+/**
+   * @brief  Отображение ошибки, которая произошла в процессе передачи файла
+   */
+void MainWindow::ShowFileSendErrorStatus()
+{
+    switch(FileTransmitter.GetErrorStatus())
+    {
+        case QFileTransfer::ERROR_DEVICE_CONNECTION:
+            ShowFileTxError("Данные не могут быть переданы. Устройство не подключено");
+            break;
+        case QFileTransfer::ERROR_FILE_IS_NOT_CHOSEN:
+            ShowFileTxError("Данные не могут быть переданы. Не выбран файл");
+            break;
+        case QFileTransfer::ERROR_NONE:
+            break;
+        default:
+            ShowFileTxError("Данные не могут быть переданы. Неизвестная ошибка");
+    }
 }

@@ -1,4 +1,4 @@
-#include "SPIMMessage.h"
+﻿#include "SPIMMessage.h"
 
 
 SPIMMessage::SPIMMessage()
@@ -17,7 +17,7 @@ SPIMMessage::SPIMMessage()
     SPIMCRC = SPIMmsgData + SIZE_OF_HEADER;
 
     Data = SPIMmsgData;
-    Body = SPIMbodyData;
+		Body = SPIMbodyData;
 }
 
 
@@ -45,7 +45,7 @@ SPIMMessage::SPIMMessage(const uint8_t* pMsgData, uint16_t msgSize)
     SPIMCRC = SPIMmsgData + SIZE_OF_HEADER + SPIMbodySize;
 
     Data = SPIMmsgData;
-    Body = SPIMbodyData;
+		Body = SPIMbodyData;
 
     return;
 }
@@ -268,11 +268,11 @@ uint8_t SPIMMessage::getAddress()
 }
 
 /**
-    * @brief  Функция читает значение номера сообщения
-    *           из соответствующего поля заголовка сообщения
-    *           SPIMMessage
-    *
-    * @retval Значение поля номера сообщения
+	* @brief  Функция читает значение номера сообщения
+	*           из соответствующего поля заголовка сообщения
+	*           SPIMMessage
+	*
+	* @retval Значение поля номера сообщения
   */
 uint8_t SPIMMessage::getNoMsg()
 {
@@ -284,11 +284,11 @@ uint8_t SPIMMessage::getNoMsg()
 }
 
 /**
-    * @brief  Функция читает значение длины тела из
-    *           соответствующего поля заголовка сообщения
-    *           SPIMMessage
-    *
-    * @retval Значение поля длины тела
+	* @brief  Функция читает значение длины тела из
+	*           соответствующего поля заголовка сообщения
+	*           SPIMMessage
+	*
+	* @retval Значение поля длины тела
   */
 uint8_t SPIMMessage::getSizeBody()
 {
@@ -300,11 +300,11 @@ uint8_t SPIMMessage::getSizeBody()
 }
 
 /**
-    * @brief  Функция читает значение идентификатора команды
-    *           из соответствующего поля заголовка сообщения
-    *           SPIMMessage
-    *
-    * @retval Значение поля идентификатора команды
+	* @brief  Функция читает значение идентификатора команды
+	*           из соответствующего поля заголовка сообщения
+	*           SPIMMessage
+	*
+	* @retval Значение поля идентификатора команды
   */
 uint8_t SPIMMessage::getIDCmd()
 {
@@ -316,9 +316,9 @@ uint8_t SPIMMessage::getIDCmd()
 }
 
 /**
-    * @brief  Функция вычисления 8-битного CRC на основе XOR
-    *
-    * @retval Значение CRC
+	* @brief  Функция вычисления 8-битного CRC на основе XOR
+	*
+	* @retval Значение CRC
   */
 uint8_t SPIMMessage::CRC_Calc(uint8_t* pData, uint8_t sizeData)
 {
@@ -329,3 +329,115 @@ uint8_t SPIMMessage::CRC_Calc(uint8_t* pData, uint8_t sizeData)
 
     return(nCRC);
 }
+
+/**
+	* @brief  Определение идентификатор команды ответа для 
+	*					исходной команды
+	*
+	* @retval Идентификатор команды ответа
+  */
+uint8_t SPIMMessage::IDBackCmd(uint8_t IDCmd)
+{
+	//Идентифкатор ответа для всех команд имеет значение на 1 больше идентификатора команды
+	return(IDCmd+1);
+}
+
+
+void SPIMMessage::ParseOpModeCode(uint8_t opModeCode, uint8_t& RadioChanType, uint8_t& SignalPower, uint8_t& ARMPowerMode) 
+{
+	RadioChanType	= (opModeCode>>SHIFT_RADIOCHANTYPE_IN_OPMODECODE)&MASK_RADIOCHANTYPE_IN_OPMODECODE;
+	
+	SignalPower = (opModeCode>>SHIFT_SIGNALPOWER_IN_OPMODECODE)&MASK_SIGNALPOWER_IN_OPMODECODE;
+	
+	ARMPowerMode = (opModeCode>>SHIFT_ARMPOWERMODE_IN_OPMODECODE)&MASK_ARMPOWERMODE_IN_OPMODECODE;
+}
+
+
+void SPIMMessage::ParseAudioCode(uint8_t audioCode, uint8_t& AudioOutLevel, uint8_t& AudioInLevel)
+{
+	AudioOutLevel = (audioCode>>SHIFT_OUTLEVEL_IN_AUDIOCODE)&MASK_OUTLEVEL_IN_AUDIOCODE;
+	
+	AudioInLevel = (audioCode>>SHIFT_INLEVEL_IN_AUDIOCODE)&MASK_INLEVEL_IN_AUDIOCODE;
+}
+
+void SPIMMessage::CmdReqParam::SetPointerToMessage(SPIMMessage* mes)
+{
+	objSPIMMessage = mes;
+}
+
+uint8_t SPIMMessage::CmdReqParam::OpModeCode(uint8_t RadioChanType, uint8_t SignalPower, uint8_t ARMPowerMode) 
+{
+ 	return( ((RadioChanType&MASK_RADIOCHANTYPE_IN_OPMODECODE)<<SHIFT_RADIOCHANTYPE_IN_OPMODECODE) |
+					((SignalPower&MASK_SIGNALPOWER_IN_OPMODECODE)<<SHIFT_SIGNALPOWER_IN_OPMODECODE)	|
+					((ARMPowerMode&MASK_ARMPOWERMODE_IN_OPMODECODE)<<SHIFT_ARMPOWERMODE_IN_OPMODECODE)	);
+}
+
+
+uint8_t SPIMMessage::CmdReqParam::AudioCode(uint8_t AudioOutLevel, uint8_t AudioInLevel)
+{
+ 	return( ((AudioOutLevel&MASK_OUTLEVEL_IN_AUDIOCODE)<<SHIFT_OUTLEVEL_IN_AUDIOCODE) |
+					((AudioInLevel&MASK_INLEVEL_IN_AUDIOCODE)<<SHIFT_INLEVEL_IN_AUDIOCODE)	);
+}
+
+
+uint8_t SPIMMessage::CmdReqParam::MaskReqParam()
+{
+	#ifdef DEBUG_SPIMMESSAGE_DEFINE_INNER_CLASS_WO_POINTER_TO_OUTTER
+	//Тут была сделана попытка доступиться к члену внешнего класса без хранения указателя на объект внешнего класса
+	//(т.е. без метода SetPointerToMessage() и добавления objSPIMMessage в члены внутреннего класса CmdReqParam),
+	//но ничего не получилось. Код компилится, но результат не тот, который должен быть. Разбираться было некогда,
+	//поэтому сделано в лоб. См. обсуждение проблемы: http://rsdn.ru/forum/cpp/2230679.all
+	return(((SPIMMessage*)this)->Body[0]);
+	#endif
+	return(objSPIMMessage->Body[0]);
+}
+
+
+uint8_t SPIMMessage::CmdReqParam::isOpModeReq()
+{
+	if(MaskReqParam() & OPMODE_MASK_IN_REQ)
+		return(1);
+	else
+		return(0);
+}
+
+uint8_t SPIMMessage::CmdReqParam::isAudioReq()
+{
+	if(MaskReqParam() & AUDIO_MASK_IN_REQ)
+		return(1);
+	else
+		return(0);	
+}
+
+uint8_t SPIMMessage::CmdReqParam::isRxFreqReq()
+{
+	if(MaskReqParam() & RXFREQ_MASK_IN_REQ)
+		return(1);
+	else
+		return(0);	
+}
+
+uint8_t SPIMMessage::CmdReqParam::isTxFreqReq()
+{
+	if(MaskReqParam() & TXFREQ_MASK_IN_REQ)
+		return(1);
+	else
+		return(0);		
+}
+
+uint8_t SPIMMessage::CmdReqParam::isRSSIReq()
+{
+	if(MaskReqParam() & RSSI_MASK_IN_REQ)
+		return(1);
+	else
+		return(0);		
+}
+
+uint8_t SPIMMessage::CmdReqParam::isChanStateReq()
+{
+	if(MaskReqParam() & CHANSTATE_MASK_IN_REQ)
+		return(1);
+	else
+		return(0);		
+}
+

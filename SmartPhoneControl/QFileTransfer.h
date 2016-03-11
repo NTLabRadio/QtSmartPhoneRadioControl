@@ -15,6 +15,7 @@
 #include <QDebug>
 
 #include "SLIPinterface.h"
+#include "SPIMMessage.h"
 #include "qSmartRadioModuleControl.h"
 
 class QFileTransfer : public QObject
@@ -26,22 +27,51 @@ public:
 
     quint16 SetFileForSend(QString name);
 
+    quint16 ResetFileForSend();
+
     QString GetFileName();
 
     quint32 GetFileSize();
 
     quint32 GetSizeOfSendedFileData();
 
+    //Статус, указывающий текущее состояние процесса передачи файла:
+    //Если статус - FILE_SEND_DENY, то см. errorStatus, расшифровывающий критическую
+    //ошибку, из-за которой процесс передачи файла не может быть начат/продолжен/завершен
+    enum en_transferStatuses
+    {
+        FILE_SEND_DENY,
+        FILE_IS_READY_FOR_SEND,
+        FILE_IS_IN_SEND_PROCESS,
+        FILE_IS_SENDED
+    } ;
+
     quint16 GetTransferStatus();
 
-    enum transferStatuses
+    enum en_transmitterStatuses
     {
-        FILE_IS_NOT_CHOSEN,
-        FILE_IS_READY_FOR_TX,
-        FILE_IS_IN_TX_PROCESS,
-        FILE_IS_TRANSMITED,
-        DEVICE_EXCHANGE_FAIL
+        TRANSMITTER_BUSY,
+        TRANSMITTER_FREE
+    } ;
+
+    quint16 GetTransmitterStatus();
+    void SetTransmitterStatus(quint16 status);
+
+    //Статус ошибки, указывающий тип критической ошибки, в результате которой
+    //процесс передачи прерван/не может быть начат
+    enum en_errorStatuses
+    {
+        ERROR_NONE,
+        ERROR_FILE_IS_NOT_CHOSEN,
+        ERROR_FILE_SIZE_IS_TOO_BIG,
+        ERROR_FILE_OPEN,
+        ERROR_DEVICE_CONNECTION,
+        ERROR_DEVICE_EXCHANGE
     };
+
+    quint16 GetErrorStatus();
+
+    static const quint32 MAX_TIME_TRANSMITTER_BUSY_MS = 500;
 
 signals:
 
@@ -61,15 +91,19 @@ private:
 
     quint32 sizeOfSendedData;
 
-    quint16 transferStatus;
+    en_transferStatuses transferStatus;
+    en_transmitterStatuses transmitterStatus;
+    en_errorStatuses errorStatus;
 
-    QByteArray baDataForSend;
+    QByteArray baFileDataRestForSend;
 
     //Размер полезной нагрузки радиопакета
     static const quint16 SIZE_OF_RADIOPACK_PAYLOAD = 81;
 
     quint8 pSLIPPackData[SLIPInterface::MAX_SIZE_OF_PACK];
     quint16 nSLIPPackSize;
+
+    quint8 noSPIMmsgs;
 };
 
 #endif // QFILETRANSFER_H
