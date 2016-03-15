@@ -14,6 +14,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     RadioDevice = new QSmartRadioModuleControl;
 
+    RadioModuleSettings = new QRadioModuleSettings;
+
     //Создание меню верхнего уровня
     CreateMenuBar();
 
@@ -21,7 +23,7 @@ MainWindow::MainWindow(QWidget *parent) :
     InitPollingCOMDevices();
 
     // Присоединяем к сигналу успешного подключения устройства слот запроса ID устройства
-    connect(RadioDevice, SIGNAL(signalConnectDevice()), this, SLOT(RequestR181GenParams()));
+    connect(RadioDevice, SIGNAL(signalConnectDevice()), this, SLOT(ReqRadioModuleParams()));
 
     // Обработка данных, принятых от устройства
     connect(RadioDevice, SIGNAL(signalReceiveData(QByteArray)),this, SLOT(ReceiveDataFromRadioModule(QByteArray)));
@@ -31,7 +33,7 @@ MainWindow::MainWindow(QWidget *parent) :
     //Создаем объект для формирования сообщений SPIM протокола
     objSPIMmsgTx = new SPIMMessage;
 
-    ui->FileTxStatus_label->setText("");
+    ui->FileTransferStatus_label->setText("");
 
     ui->SLIPTxStatus_label->setText("");
     ui->SLIPRxStatus_label->setText("");
@@ -365,7 +367,113 @@ void MainWindow::ReceiveDataFromRadioModule(QByteArray baRcvdData)
     ShowRcvdSPIMMsg(SPIMBackCmd);
     #endif
 
+    //Обрабатываем команду от радиомодуля
+    ProcessCmdFromRadioModule(SPIMBackCmd);
+}
 
+
+void MainWindow::ProcessCmdFromRadioModule(SPIMMessage SPIMCmd)
+{
+    if(SPIMCmd.checkCRC())
+    {
+        switch(SPIMCmd.getIDCmd())
+        {
+            case SPIM_CMD_TAKE_DATA_FRAME_BACK:
+            {
+                ProcessDataPackFromRadioModule(SPIMCmd.Body,SPIMCmd.getSizeBody());
+                break;
+            }
+            case SPIM_CMD_REQ_CURRENT_PARAM_BACK:
+            {
+                ProcessCurParamFromRadioModule(SPIMCmd);
+                ShowRadioModuleParams();
+                break;
+            }
+            default:
+                break;
+        }
+    }
+}
+
+
+void MainWindow::ProcessDataPackFromRadioModule(uint8_t* pData, uint16_t sizeBody)
+{
+
+}
+
+
+void MainWindow::ProcessCurParamFromRadioModule(SPIMMessage SPIMCmdRcvd)
+{
+    //Значения параметров начинаются со 2ого байта тела сообщения
+    uint8_t* pParams = SPIMCmdRcvd.Body+1;
+    uint8_t numParams = 0;
+
+    //Первый байт тела сообщения - маска параметров, которая может быть распознана с помощью подкласса CmdReqParam,
+    //применимого как к команде SPIM_CMD_REQ_CURRENT_PARAM, так и к SPIM_CMD_REQ_CURRENT_PARAM_BACK
+
+    //Для использования вложенного класса cmdReqParam передадим ему указатель на сообщение
+    SPIMCmdRcvd.cmdReqParam.SetPointerToMessage(&SPIMCmdRcvd);
+
+    //Если запрашивается рабочий режим радиомодуля
+    if(SPIMCmdRcvd.cmdReqParam.isOpModeReq())
+    {
+        //Извлекаем из тела SPIMCmdRcvd код рабочего режима, парсим его и копируем параметры в RadioModuleSettings
+        uint8_t opModeCode = pParams[numParams++];
+
+        uint8_t RadioChanType, SignalPower, ARMPowerMode;
+        SPIMMessage::ParseOpModeCode(opModeCode,  RadioChanType, SignalPower, ARMPowerMode);
+        RadioModuleSettings->SetRadioChanType(RadioChanType);
+        RadioModuleSettings->SetRadioSignalPower(SignalPower);
+        RadioModuleSettings->SetARMPowerMode(ARMPowerMode);
+    }
+
+    //Если запрашиваются аудиопараметры радиомодуля
+    if(SPIMCmdRcvd.cmdReqParam.isAudioReq())
+    {
+        //Извлекаем из тела SPIMCmdRcvd код аудиопараметров, парсим его и копируем параметры в RadioModuleSettings
+        uint8_t audioCode = pParams[numParams++];
+
+        uint8_t AudioOutLevel, AudioInLevel;
+        SPIMMessage::ParseAudioCode(audioCode, AudioOutLevel, AudioInLevel);
+        RadioModuleSettings->SetAudioOutLevel(AudioOutLevel);
+        RadioModuleSettings->SetAudioInLevel(AudioInLevel);
+    }
+
+    //Если запрашивается частота приема радиомодуля
+    if(SPIMCmdRcvd.cmdReqParam.isRxFreqReq())
+    {
+        //Извлекаем из тела SPIMCmdRcvd код частоты и копируем ее в RadioModuleSettings
+        uint16_t rxFreq;
+        memcpy(&rxFreq, pParams+numParams, sizeof(rxFreq));
+        numParams+=sizeof(rxFreq);
+        RadioModuleSettings->SetRxFreqChan(rxFreq);
+    }
+
+    //Если запрашивается частота передачи радиомодуля
+    if(SPIMCmdRcvd.cmdReqParam.isTxFreqReq())
+    {
+        //Извлекаем из тела SPIMCmdRcvd код частоты и копируем ее в RadioModuleSettings
+        uint16_t txFreq;
+        memcpy(&txFreq, pParams+numParams, sizeof(txFreq));
+        numParams+=sizeof(txFreq);
+        RadioModuleSettings->SetTxFreqChan(txFreq);
+    }
+
+    //Если запрашивается текущий уровень приема сигнала
+    if(SPIMCmdRcvd.cmdReqParam.isRSSIReq())
+    {
+        //Извлекаем из тела SPIMCmdRcvd значение RSSI и копируем его в RadioModuleSettings
+        uint8_t RSSILevel = pParams[numParams++];
+        RadioModuleSettings->SetRSSILevel(RSSILevel);
+    }
+
+    //Если запрашивается текущее состояние радиоканала
+    if(SPIMCmdRcvd.cmdReqParam.isChanStateReq())
+    {
+        //Извлекаем из тела SPIMCmdRcvd состояние радиоканала и копируем его в RadioModuleSettings
+        uint8_t chanState = pParams[numParams++];
+        RadioModuleSettings->SetRadioChanState(chanState);
+    }
 }
 
 
@@ -765,7 +873,7 @@ void MainWindow::CheckFileTransferStatus()
 
     //Поскольку передатчик освободился, значит, пакет был передан, изменился размер переданных данных - стоит
     //перерисовать ProgressBar
-    ui->FileSend_progressBar->setValue(100 * FileTransmitter.GetSizeOfSendedFileData() / FileTransmitter.GetFileSize());
+    ui->FileTransfer_progressBar->setValue(100 * FileTransmitter.GetSizeOfSendedFileData() / FileTransmitter.GetFileSize());
 
     //Радимодуль свободен, можно ему послать следующий пакет данных для передачи в эфир
     SendFilePackToTransceiver();
@@ -786,7 +894,7 @@ void MainWindow::SendFilePackToTransceiver()
    */
 void MainWindow::ShowFileTxError(QString strError)
 {
-    ui->FileTxStatus_label->setText(strError);
+    ui->FileTransferStatus_label->setText(strError);
 }
 
 /**
@@ -794,7 +902,7 @@ void MainWindow::ShowFileTxError(QString strError)
    */
 void MainWindow::ClearFileTxError()
 {
-    ui->FileTxStatus_label->setText("");
+    ui->FileTransferStatus_label->setText("");
 }
 
 /**
@@ -803,10 +911,10 @@ void MainWindow::ClearFileTxError()
    */
 void MainWindow::SetFileSendProgressBarFail()
 {
-    QPalette pal = ui->FileSend_progressBar->palette();
+    QPalette pal = ui->FileTransfer_progressBar->palette();
     pal.setColor(QPalette::Highlight, QColor("red"));
-    ui->FileSend_progressBar->setPalette(pal);
-    ui->FileSend_progressBar->repaint();
+    ui->FileTransfer_progressBar->setPalette(pal);
+    ui->FileTransfer_progressBar->repaint();
 }
 
 /**
@@ -815,11 +923,11 @@ void MainWindow::SetFileSendProgressBarFail()
    */
 void MainWindow::SetFileSendProgressBarSuccess()
 {
-    ui->FileSend_progressBar->setValue(100);
-    QPalette pal = ui->FileSend_progressBar->palette();
+    ui->FileTransfer_progressBar->setValue(100);
+    QPalette pal = ui->FileTransfer_progressBar->palette();
     pal.setColor(QPalette::Highlight, QColor("green"));
-    ui->FileSend_progressBar->setPalette(pal);
-    ui->FileSend_progressBar->repaint();
+    ui->FileTransfer_progressBar->setPalette(pal);
+    ui->FileTransfer_progressBar->repaint();
 }
 
 /**
@@ -840,4 +948,139 @@ void MainWindow::ShowFileSendErrorStatus()
         default:
             ShowFileTxError("Данные не могут быть переданы. Неизвестная ошибка");
     }
+}
+
+
+void MainWindow::on_Volume_spinBox_valueChanged(int arg1)
+{
+    RadioModuleSettings->SetAudioOutLevel(arg1);
+    SendSPIMMsg(SPIM_CMD_SET_MODE);
+}
+
+
+void MainWindow::on_MicSens_spinBox_valueChanged(int arg1)
+{
+    RadioModuleSettings->SetAudioInLevel(arg1);
+    SendSPIMMsg(SPIM_CMD_SET_MODE);
+}
+
+
+void MainWindow::SendSPIMMsg(uint8_t nSPIMmsgIDCmd)
+{
+    SPIMMessage SPIMmsgForSend;
+
+    uint8_t nSPIMMsgBodySize;
+    QByteArray baBody;
+
+    switch(nSPIMmsgIDCmd)
+    {
+        case SPIM_CMD_NOP:
+        {
+            nSPIMMsgBodySize = 1;
+            //TODO Неименованная константа
+            uint8_t nNOPSymbol = 0x6D;
+            baBody.append(nNOPSymbol);
+            break;
+        }
+        case SPIM_CMD_SET_MODE:
+        {
+            nSPIMMsgBodySize = 6;
+            //TODO Все текущие настройки радиомодуля должны храниться в отдельном классе, который
+            //должен наполняться данными при подключении устройства. В этом месте просто копируем данные
+            //из свойств класса в тело сообщения
+            uint8_t nOpModeCode = SPIMMessage::CmdReqParam::OpModeCode(RadioModuleSettings->GetRadioChanType(),
+                                                                                                                        RadioModuleSettings->GetRadioSignalPower(),
+                                                                                                                        RadioModuleSettings->GetARMPowerMode()) ;
+            uint8_t nAudioCode = SPIMMessage::CmdReqParam::AudioCode(RadioModuleSettings->GetAudioOutLevel(),
+                                                                                                               RadioModuleSettings->GetAudioInLevel());
+            uint16_t nFreqTxCode = RadioModuleSettings->GetTxFreqChan();
+            uint16_t nFreqRxCode = RadioModuleSettings->GetRxFreqChan();
+
+            baBody.append(nOpModeCode);
+            baBody.append(nAudioCode);
+            baBody.append(nFreqTxCode);
+            baBody.append(nFreqRxCode);
+            break;
+        }
+        case SPIM_CMD_SEND_DATA_FRAME:
+        {
+            break;
+        }
+        case SPIM_CMD_TAKE_DATA_FRAME:
+        {
+            break;
+        }
+        case SPIM_CMD_REQ_CURRENT_PARAM:
+        {
+            nSPIMMsgBodySize = 1;
+            quint8 maskParam = SPIMMessage::CmdReqParam::OPMODE_MASK_IN_REQ |
+                                            SPIMMessage::CmdReqParam::AUDIO_MASK_IN_REQ     |
+                                            SPIMMessage::CmdReqParam::TXFREQ_MASK_IN_REQ   |
+                                            SPIMMessage::CmdReqParam::RXFREQ_MASK_IN_REQ;
+            baBody.append(maskParam);
+            break;
+        }
+        case SPIM_CMD_SOFT_VER:
+        {
+            nSPIMMsgBodySize = 0;
+            break;
+        }
+        default:
+            break;
+    }
+
+    //TODO Этот номер должен быть свойством класса, который отвечает за формирование и разбор сообщения SPIM-протокола
+    //При использовании класса для формирования сообщений их номера должны инкрементироваться автоматически
+    uint8_t nSPIMMsgNo = 0;
+
+    //Составляем заголовок сообщения
+    SPIMmsgForSend.setHeader(nSPIMMsgBodySize, SPIMMessage::SPIM_ADDR_STM32, nSPIMMsgNo, nSPIMmsgIDCmd);
+    //TODO Надо где-то инкрементировать noSPIMmsgs, а также обрабатывать ответ от радиомодуля, в т.ч. отсутствие ответа и
+    //ответ о том, что приняты данные с неверным CRC
+
+    //Вставляем в сообщение тело
+    SPIMmsgForSend.setBody((uint8_t*)baBody.data(),nSPIMMsgBodySize);
+
+    //Расчитываем и вставляем в сообщение контрольную сумму
+    SPIMmsgForSend.setCRC();
+
+
+    //Теперь сообщение SPIMmsgForSend упаковываем в SLIP-протокол
+    quint8 pSLIPPackData[SLIPInterface::MAX_SIZE_OF_PACK];
+    quint16 nSLIPPackSize;
+
+    memset(pSLIPPackData,0,SLIPInterface::MAX_SIZE_OF_PACK);
+
+    //Формируем SLIP-пакет
+    SLIPInterface::FormPack((uint8_t*)SPIMmsgForSend.Data, (uint16_t)SPIMmsgForSend.Size, (uint8_t*)pSLIPPackData, (uint16_t&)nSLIPPackSize);
+
+    QByteArray baUSBPackForSend;
+    baUSBPackForSend.append((const char*)pSLIPPackData, nSLIPPackSize);
+
+    //Передаем данные в порт
+    RadioDevice->SendDataToPort(baUSBPackForSend);
+}
+
+
+
+void MainWindow::ReqRadioModuleParams()
+{
+    SendSPIMMsg(SPIM_CMD_REQ_CURRENT_PARAM);
+}
+
+
+void MainWindow::ShowRadioModuleParams()
+{
+    double doubleFreqMhz;
+
+    doubleFreqMhz = (QRadioModuleSettings::RADIO_BASE_FREQ_KHZ +
+                                RadioModuleSettings->GetTxFreqChan()*QRadioModuleSettings::RADIO_FREQCHAN_STEP_KHZ) / 1000;
+    ui->FreqTx_SpinBox->setValue(doubleFreqMhz);
+
+    doubleFreqMhz = (QRadioModuleSettings::RADIO_BASE_FREQ_KHZ +
+                                RadioModuleSettings->GetRxFreqChan()*QRadioModuleSettings::RADIO_FREQCHAN_STEP_KHZ) / 1000;
+    ui->FreqRx_SpinBox->setValue(doubleFreqMhz);
+
+    ui->Volume_spinBox->setValue(RadioModuleSettings->GetAudioOutLevel());
+    ui->MicSens_spinBox->setValue(RadioModuleSettings->GetAudioInLevel());
 }

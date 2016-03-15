@@ -17,13 +17,15 @@ SOURCES += main.cpp\
     qSmartRadioModuleControl.cpp \
     SPIMMessage.cpp \
     QFileTransfer.cpp \
-    SLIPinterface.cpp
+    SLIPinterface.cpp \
+    QRadioModuleSettings.cpp
 
 HEADERS  += mainwindow.h \
     qSmartRadioModuleControl.h \
     SPIMMessage.h \
     ../QFileTransfer.h \
     QFileTransfer.h \
-    SLIPinterface.h
+    SLIPinterface.h \
+    QRadioModuleSettings.h
 
 FORMS    += mainwindow.ui

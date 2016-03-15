@@ -8,6 +8,7 @@
 #include <QtSerialPort/QSerialPortInfo>
 
 #include "QFileTransfer.h"
+#include "QRadioModuleSettings.h"
 #include "qSmartRadioModuleControl.h"
 #include "slipinterface.h"
 #include "SPIMMessage.h"
@@ -58,6 +59,12 @@ private slots:
 
     void CheckFileTransferStatus();
 
+    void on_Volume_spinBox_valueChanged(int arg1);
+
+    void on_MicSens_spinBox_valueChanged(int arg1);
+
+    void ReqRadioModuleParams();
+
 private:
     static const quint16  DE9943_PRODUCT_ID = 0x0585;           //ID продукта макетной платы радиоблока
     static const quint16  DE9943_VENDOR_ID = 0x1747;             //ID производителя макетной платы радиоблока
@@ -65,6 +72,8 @@ private:
     Ui::MainWindow *ui;
 
     QSmartRadioModuleControl* RadioDevice;    // Объект для работы с устройством
+
+    QRadioModuleSettings* RadioModuleSettings;
 
     SLIPInterface* objSLIPInterface;                    //Объект для работы с SLIP-интерфейсом
 
@@ -128,6 +137,14 @@ private:
     void SetFileSendProgressBarSuccess();
 
     void ShowFileSendErrorStatus();
+
+    void ProcessDataPackFromRadioModule(uint8_t* pData, uint16_t sizeBody);
+    void ProcessCmdFromRadioModule(SPIMMessage SPIMCmd);
+    void ProcessCurParamFromRadioModule(SPIMMessage SPIMCmdRcvd);
+
+    void SendSPIMMsg(uint8_t nIDCmd);
+
+    void ShowRadioModuleParams();
 };
 
 #endif // MAINWINDOW_H
