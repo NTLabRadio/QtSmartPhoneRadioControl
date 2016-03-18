@@ -35,6 +35,7 @@ public slots:
 
 signals:
     void signalSendNextFilePack(QSmartRadioModuleControl*);
+    void signalRcvFilePack(SPIMMessage* SPIMmsg);
 
 private slots:
     void ShowAvailPortsInMenu();
@@ -59,11 +60,15 @@ private slots:
 
     void CheckFileTransferStatus();
 
+    void CheckFileReceiveStatus();
+
     void on_Volume_spinBox_valueChanged(int arg1);
 
     void on_MicSens_spinBox_valueChanged(int arg1);
 
     void ReqRadioModuleParams();
+
+    void ClearRadioModuleParams();
 
 private:
     static const quint16  DE9943_PRODUCT_ID = 0x0585;           //ID продукта макетной платы радиоблока
@@ -101,6 +106,8 @@ private:
     QTimer *timerWavSend;                               // Таймер для периодической посылки звуковых данных на устройство
     void InitWavSendTimer();
 
+    void ClearDebugSLIPStatuses();
+
     enum   enStateSendFile
     {
         STATE_IDLE_FILE_SEND,
@@ -121,30 +128,45 @@ private:
     QFileTransfer FileTransmitter;
 
     void ShowFileTxError(QString strError);
+    void ShowFileTxSuccess(QString strSuccessMsg);
     void ClearFileTxError();
 
     // Таймер периодического контроля процесса передачи файла на устройство
     QTimer *timerFileSend =  NULL;
     //Период проверки состояния радиомодуля в процессе передачи файла на устройство
-    static const quint16 PERIOD_MS_CHECK_FILE_SEND_STATUS = 100;
+    static const quint16 PERIOD_MS_CHECK_FILE_SEND_STATUS = 200;
+
+    // Таймер периодического контроля процесса приема файла от устройства
+    QTimer *timerFileRcv =  NULL;
+    //Период проверки состояния радиомодуля в процессе приема файла
+    static const quint16 PERIOD_MS_CHECK_FILE_RCV_STATUS = 200;
 
     quint32 timeTransmitterBusyMs;
 
     void InitFileSendTimer();
     void DeinitFileSendTimer();
 
+    void InitFileRcvTimer();
+    void DeinitFileRcvTimer();
+
     void SetFileSendProgressBarFail();
     void SetFileSendProgressBarSuccess();
 
     void ShowFileSendErrorStatus();
 
-    void ProcessDataPackFromRadioModule(uint8_t* pData, uint16_t sizeBody);
-    void ProcessCmdFromRadioModule(SPIMMessage SPIMCmd);
-    void ProcessCurParamFromRadioModule(SPIMMessage SPIMCmdRcvd);
+    void ProcessDataPackFromRadioModule(SPIMMessage* pSPIMMsgRcvd);
+    void ProcessCmdFromRadioModule(SPIMMessage* SPIMCmd);
+    void ProcessCurParamFromRadioModule(SPIMMessage* SPIMCmdRcvd);
 
     void SendSPIMMsg(uint8_t nIDCmd);
 
     void ShowRadioModuleParams();
+
+    bool IsAllowSetRadioModuleParams();
+    void DenySetRadioModuleParams();
+    void AllowSetRadioModuleParams();
+
+    bool flAllowSetRadioModuleParams;
 };
 
 #endif // MAINWINDOW_H

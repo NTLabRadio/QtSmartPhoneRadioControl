@@ -18,6 +18,26 @@ QRadioModuleSettings::QRadioModuleSettings(QObject *parent) :
     RadioChanState = RADIOCHAN_STATE_IDLE;
 }
 
+
+uint8_t QRadioModuleSettings::ResetSettings()
+{
+    RadioChanType = RADIOCHAN_TYPE_IDLE;
+    RadioSignalPower = RADIO_SIGNALPOWER_LOW;
+    ARMPowerMode = ARM_POWERMODE_NORMAL;
+
+    NoTxFreqChan = DEFAULT_TX_FREQ_CHAN;
+    NoRxFreqChan = DEFAULT_RX_FREQ_CHAN;
+
+    AudioInLevel = DEFAULT_AUDIO_IN_GAIN;
+    AudioOutLevel = DEFAULT_AUDIO_OUT_GAIN;
+
+    RSSILevel = 0;
+
+    RadioChanState = RADIOCHAN_STATE_IDLE;
+
+    return(0);
+}
+
 uint8_t QRadioModuleSettings::SetRadioChanType(uint8_t chanType)
 {
     if(chanType<NUM_RADIOCHAN_TYPES)

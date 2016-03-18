@@ -135,9 +135,13 @@ en_results QSmartRadioModuleControl::DisconnectDevice()
 
     qDebug() << "Устройство отключено";
 
+    emit signalDisconnectDevice();
+
     return(RES_SUCCESS);
 }
 
+#define DEBUG_QSRMODULE_SHOW_RAW_DATA
+quint16 g_numCallReadDataFromPort = 0;
 
 // ------------------------------------------------------------------------------------------
 // Функция-слот, предназначенная для обработки данных от устройства. Вызывается при появлении
@@ -149,6 +153,8 @@ void QSmartRadioModuleControl::ReadDataFromPort()
     QString strmes;
     int cntBytes;
     #endif
+
+    g_numCallReadDataFromPort++;
 
     baReceivedData.clear();
     baReceivedData = serialPort->readAll();

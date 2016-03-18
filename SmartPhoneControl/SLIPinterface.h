@@ -34,6 +34,15 @@ public:
     //Протокол SLIP операцией байт-стафинга может увеличивать размер данных в 2 раза + 2 символа FEND
     static const uint16_t  MAX_SIZE_OF_PACK = (2*MAX_SIZE_OF_SLIP_PACK_PAYLOAD + 2);
 
+    //Возможные состояния автомата поиска SLIP-пакета в массиве данных (используется FindPackInData())
+      enum en_FindPackStates
+      {
+          PACK_NO_FOUND,                                      //пакет не найден
+          PACK_BEGIN_FOUND,                                 //найден старт-байт пакета
+          PACK_FOUND,                                            //найден весь пакет
+          PACK_FORMAT_ERROR  = (UCHAR_MAX)    //данные пакета некорректны
+      };
+
 private:
 	//Специальные символы протокола SLIP
     static const uint8_t FEND = (0xC0);      /* "Frame End" symbol, i.e. begin/end of packet */
@@ -45,14 +54,6 @@ private:
     static const uint8_t RESULT_SUCCESS = (0);
     static const uint8_t RESULT_FAIL = (UCHAR_MAX);
 
-	//Возможные состояния автомата поиска SLIP-пакета в массиве данных (используется FindPackInData())
-  enum en_FindPackStates
-  {
-      PACK_NO_FOUND,         //пакет не найден
-      PACK_BEGIN_FOUND,    //найден старт-байт пакета
-      PACK_FOUND                //найден весь пакет
-  };
-	
 	//Возможные состояния интерфейса SLIPс
     enum en_InterfaceStates
 	{

@@ -191,10 +191,15 @@ uint8_t SLIPInterface::FindPackInData(uint8_t* pData, uint16_t nDataSize, uint8_
                     }
                     else
                     {
+                        //Все плохо. В обрабатываемом SLIP-пакете найден одинокий символ FESC, не входящий в ESC-последовательность
+                        //Пакет не может быть обработан. Завершаем выполнение функции с ошибкой
+                        stateFindAutom = PACK_FORMAT_ERROR;
+
                         #ifdef QTDEBUG_SLIP_PRINTOUT_EXCEPTIONS
                         qDebug() << "WARNING! ::FindSLIPPackInData() В обрабатываемом SLIP-пакете найден одинокий символ FESC, не входящий в ESC-последовательность";
                         #endif
-                        return(RESULT_FAIL);
+
+                        return(stateFindAutom);
                     }
                 }
                 break;

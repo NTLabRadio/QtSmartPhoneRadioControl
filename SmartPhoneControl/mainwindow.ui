@@ -116,7 +116,7 @@
           </size>
          </property>
          <property name="styleSheet">
-          <string notr="true">color: rgb(255, 0, 0);</string>
+          <string notr="true"/>
          </property>
          <property name="text">
           <string>TransferFileStatus</string>
@@ -125,7 +125,7 @@
        </item>
       </layout>
      </widget>
-     <widget class="QGroupBox" name="groupBox">
+     <widget class="QGroupBox" name="RadioSettings_groupBox">
       <property name="geometry">
        <rect>
         <x>30</x>
@@ -140,9 +140,9 @@
       <widget class="QWidget" name="layoutWidget">
        <property name="geometry">
         <rect>
-         <x>29</x>
+         <x>60</x>
          <y>109</y>
-         <width>431</width>
+         <width>381</width>
          <height>32</height>
         </rect>
        </property>
@@ -225,9 +225,9 @@
       <widget class="QWidget" name="layoutWidget">
        <property name="geometry">
         <rect>
-         <x>29</x>
+         <x>50</x>
          <y>29</y>
-         <width>431</width>
+         <width>401</width>
          <height>31</height>
         </rect>
        </property>
@@ -297,12 +297,12 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="layoutWidget">
+      <widget class="QWidget" name="">
        <property name="geometry">
         <rect>
-         <x>31</x>
-         <y>70</y>
-         <width>428</width>
+         <x>40</x>
+         <y>71</y>
+         <width>421</width>
          <height>27</height>
         </rect>
        </property>
@@ -329,6 +329,9 @@
             <pointsize>12</pointsize>
            </font>
           </property>
+          <property name="suffix">
+           <string> МГц</string>
+          </property>
           <property name="decimals">
            <number>3</number>
           </property>
@@ -350,7 +353,7 @@
           </property>
           <property name="sizeHint" stdset="0">
            <size>
-            <width>18</width>
+            <width>38</width>
             <height>17</height>
            </size>
           </property>
@@ -367,22 +370,9 @@
            </font>
           </property>
           <property name="text">
-           <string>Симплекс</string>
+           <string>изм</string>
           </property>
          </widget>
-        </item>
-        <item>
-         <spacer name="horizontalSpacer_4">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>18</width>
-            <height>17</height>
-           </size>
-          </property>
-         </spacer>
         </item>
         <item>
          <widget class="QLabel" name="FreqRx_label">
@@ -405,6 +395,9 @@
            <font>
             <pointsize>12</pointsize>
            </font>
+          </property>
+          <property name="suffix">
+           <string> МГц</string>
           </property>
           <property name="decimals">
            <number>3</number>

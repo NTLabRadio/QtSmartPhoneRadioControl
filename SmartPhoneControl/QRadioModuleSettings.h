@@ -10,6 +10,8 @@ class QRadioModuleSettings : public QObject
 public:
     explicit QRadioModuleSettings(QObject *parent = 0);
 
+    uint8_t ResetSettings();
+
     uint8_t SetRadioChanType(uint8_t chanType);
     uint8_t GetRadioChanType();
 

@@ -43,6 +43,7 @@ public:
 signals:
     void signalReceiveData(QByteArray baData);
     void signalConnectDevice();
+    void signalDisconnectDevice();
 
 public slots:
 
