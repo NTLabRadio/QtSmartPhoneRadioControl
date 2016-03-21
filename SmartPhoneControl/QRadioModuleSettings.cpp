@@ -1,5 +1,8 @@
 #include "QRadioModuleSettings.h"
 
+QStringList QRadioModuleSettings::RadioBaudRateNames  = QStringList() << "4800" << "9600" << "19200" << "48000";
+
+
 QRadioModuleSettings::QRadioModuleSettings(QObject *parent) :
     QObject(parent)
 {
@@ -84,6 +87,22 @@ uint8_t QRadioModuleSettings::SetARMPowerMode(uint8_t powerMode)
 uint8_t QRadioModuleSettings::GetARMPowerMode()
 {
     return(ARMPowerMode);
+}
+
+uint8_t QRadioModuleSettings::SetRadioBaudRate(uint8_t baudRate)
+{
+     if(baudRate<NUM_RADIO_BAUD_RATES)
+    {
+        RadioBaudRate = (en_RadioBaudRates)baudRate;
+        return(0);
+    }
+    else
+        return(1);
+}
+
+uint8_t QRadioModuleSettings::GetRadioBaudRate()
+{
+    return(RadioBaudRate);
 }
 
 uint8_t QRadioModuleSettings::SetTxFreqChan(uint16_t noFreqChan)

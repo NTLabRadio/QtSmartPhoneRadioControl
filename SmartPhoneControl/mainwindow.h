@@ -70,6 +70,14 @@ private slots:
 
     void ClearRadioModuleParams();
 
+    void on_FreqTx_SpinBox_valueChanged(double arg1);
+
+    void on_FreqRx_SpinBox_valueChanged(double arg1);
+
+    void on_flagSimplex_checkBox_clicked(bool checked);
+
+    void on_OpMode_comboBox_currentIndexChanged(int index);
+
 private:
     static const quint16  DE9943_PRODUCT_ID = 0x0585;           //ID продукта макетной платы радиоблока
     static const quint16  DE9943_VENDOR_ID = 0x1747;             //ID производителя макетной платы радиоблока
@@ -127,19 +135,21 @@ private:
 
     QFileTransfer FileTransmitter;
 
-    void ShowFileTxError(QString strError);
-    void ShowFileTxSuccess(QString strSuccessMsg);
-    void ClearFileTxError();
+    void ShowFileTransferError(QString strError);
+    void ShowFileTransferSuccess(QString strSuccessMsg);
+    void ClearFileTransferError();
 
     // Таймер периодического контроля процесса передачи файла на устройство
     QTimer *timerFileSend =  NULL;
     //Период проверки состояния радиомодуля в процессе передачи файла на устройство
     static const quint16 PERIOD_MS_CHECK_FILE_SEND_STATUS = 200;
+    quint16 TimeIntervalMsSendRadioPack;
 
     // Таймер периодического контроля процесса приема файла от устройства
     QTimer *timerFileRcv =  NULL;
     //Период проверки состояния радиомодуля в процессе приема файла
     static const quint16 PERIOD_MS_CHECK_FILE_RCV_STATUS = 200;
+    quint16 TimeIntervalMsCheckFileRcvStatus;
 
     quint32 timeTransmitterBusyMs;
 
@@ -167,6 +177,8 @@ private:
     void AllowSetRadioModuleParams();
 
     bool flAllowSetRadioModuleParams;
+
+    void SetTimeIntervalsForCheckFileTransferStatus();
 };
 
 #endif // MAINWINDOW_H

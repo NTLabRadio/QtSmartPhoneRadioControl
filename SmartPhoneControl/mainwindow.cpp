@@ -10,7 +10,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    this->setWindowTitle("SmartPhoneControl ver 1.2");
+    this->setWindowTitle("SmartPhoneControl ver 1.3");
 
     RadioDevice = new QSmartRadioModuleControl;
 
@@ -50,6 +50,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->FileTransferStatus_label->setText("");
     ClearRadioModuleParams();
     AllowSetRadioModuleParams();
+
+    ui->OpMode_comboBox->addItems(QRadioModuleSettings::RadioBaudRateNames);
 }
 
 
@@ -428,7 +430,12 @@ void MainWindow::ProcessDataPackFromRadioModule(SPIMMessage* SPIMMsgRcvd)
     }
 
     if(FileTransmitter.GetRcvFileStatus()==QFileTransfer::FILE_RCV_WAITING)
+    {
         InitFileRcvTimer();
+
+        ShowFileTransferSuccess("Начат прием файла");
+        ui->FileTransfer_progressBar->setValue(0);
+    }
 
     emit signalRcvFilePack(SPIMMsgRcvd);
 
@@ -453,11 +460,14 @@ void MainWindow::ProcessCurParamFromRadioModule(SPIMMessage* SPIMCmdRcvd)
         //Извлекаем из тела SPIMCmdRcvd код рабочего режима, парсим его и копируем параметры в RadioModuleSettings
         uint8_t opModeCode = pParams[numParams++];
 
-        uint8_t RadioChanType, SignalPower, ARMPowerMode;
-        SPIMMessage::ParseOpModeCode(opModeCode,  RadioChanType, SignalPower, ARMPowerMode);
+        uint8_t RadioChanType, SignalPower, ARMPowerMode, BaudRate;
+        SPIMMessage::ParseOpModeCode(opModeCode,  RadioChanType, SignalPower, ARMPowerMode, BaudRate);
         RadioModuleSettings->SetRadioChanType(RadioChanType);
         RadioModuleSettings->SetRadioSignalPower(SignalPower);
         RadioModuleSettings->SetARMPowerMode(ARMPowerMode);
+        RadioModuleSettings->SetRadioBaudRate(BaudRate);
+
+        SetTimeIntervalsForCheckFileTransferStatus();
     }
 
     //Если запрашиваются аудиопараметры радиомодуля
@@ -794,7 +804,7 @@ void MainWindow::on_FileTransfer_Button_clicked()
 
     if(NameOfFileForSend == "")
     {
-         ShowFileTxError("Файл не выбран");
+         ShowFileTransferError("Файл не выбран");
         return;
     }
 
@@ -805,15 +815,15 @@ void MainWindow::on_FileTransfer_Button_clicked()
         switch(FileTransmitter.GetErrorStatus())
         {
             case QFileTransfer::ERROR_FILE_OPEN:
-                ShowFileTxError("Файл не может быть передан. Ошибка открытия файла");
+                ShowFileTransferError("Файл не может быть передан. Ошибка открытия файла");
                 break;
             case QFileTransfer::ERROR_FILE_SIZE_IS_TOO_BIG:
-                ShowFileTxError("Файл не может быть передан. Превышен максимальный размер файла");
+                ShowFileTransferError("Файл не может быть передан. Превышен максимальный размер файла");
                 break;
         }
     }
     else
-       ClearFileTxError();
+       ClearFileTransferError();
 }
 
 
@@ -825,17 +835,17 @@ void MainWindow::on_SendFile_Button_clicked()
     switch(FileTransmitter.GetSendFileStatus())
     {
         case QFileTransfer::FILE_IS_READY_FOR_SEND:
-            ClearFileTxError();
+            ClearFileTransferError();
             //Стартуем таймер, контролирующий процесс передачи файла
             InitFileSendTimer();
             break;
         case QFileTransfer::FILE_IS_IN_SEND_PROCESS:
-            ShowFileTxError("Этот файл уже передается");
+            ShowFileTransferError("Этот файл уже передается");
             break;
         case QFileTransfer::FILE_IS_SENDED:
             FileTransmitter.ResetFileForSend();
 
-            ClearFileTxError();
+            ClearFileTransferError();
             //Стартуем таймер, контролирующий процесс передачи файла
             InitFileSendTimer();
             break;
@@ -853,7 +863,7 @@ void MainWindow::InitFileSendTimer()
     {
         timerFileSend = new QTimer(this);
         connect(timerFileSend,SIGNAL(timeout()),this,SLOT(CheckFileTransferStatus()));
-        timerFileSend->setInterval(PERIOD_MS_CHECK_FILE_SEND_STATUS);
+        timerFileSend->setInterval(TimeIntervalMsSendRadioPack);
     }
 
     timerFileSend->start();
@@ -875,7 +885,7 @@ void MainWindow::InitFileRcvTimer()
     {
         timerFileRcv = new QTimer(this);
         connect(timerFileRcv,SIGNAL(timeout()),this,SLOT(CheckFileReceiveStatus()));
-        timerFileRcv->setInterval(PERIOD_MS_CHECK_FILE_RCV_STATUS);
+        timerFileRcv->setInterval(TimeIntervalMsCheckFileRcvStatus);
     }
 
     timerFileRcv->start();
@@ -897,7 +907,7 @@ void MainWindow::CheckFileTransferStatus()
     if(FileTransmitter.GetSendFileStatus()==QFileTransfer::FILE_IS_SENDED)
     {
         DeinitFileSendTimer();
-        ShowFileTxSuccess("Данные успешно переданы");
+        ShowFileTransferSuccess("Файл " + FileTransmitter.GetSendFileName() + " успешно передан");
         SetFileSendProgressBarSuccess();
         return;
     }
@@ -922,18 +932,20 @@ void MainWindow::CheckFileTransferStatus()
         if(timeTransmitterBusyMs > QFileTransfer::MAX_TIME_TRANSMITTER_BUSY_MS)
         {
             DeinitFileSendTimer();
-            ShowFileTxError("Данные не могут быть переданы. Передатчик слишком долго не отвечает");
+            ShowFileTransferError("Данные не могут быть переданы. Передатчик слишком долго не отвечает");
             SetFileSendProgressBarFail();
             FileTransmitter.ResetFileForSend();
         }
         else
-            timeTransmitterBusyMs+=PERIOD_MS_CHECK_FILE_SEND_STATUS;
+            timeTransmitterBusyMs+=TimeIntervalMsSendRadioPack;
 
         return;
     }
 
     timeTransmitterBusyMs = 0;
 #endif
+
+     ShowFileTransferSuccess("Идет передача файла " + FileTransmitter.GetSendFileName());
 
     //Поскольку передатчик освободился, значит, пакет был передан, изменился размер переданных данных - стоит
     //перерисовать ProgressBar
@@ -952,7 +964,7 @@ void MainWindow::CheckFileReceiveStatus()
     if(FileTransmitter.GetRcvFileStatus()==QFileTransfer::FILE_IS_RCVD)
     {
         DeinitFileRcvTimer();
-        ShowFileTxSuccess("Файл успешно принят");
+        ShowFileTransferSuccess("Файл " + FileTransmitter.GetRcvFileName() + " успешно принят");
         SetFileSendProgressBarSuccess();
         return;
     }
@@ -966,14 +978,10 @@ void MainWindow::CheckFileReceiveStatus()
         return;
     }
 
-    if(FileTransmitter.GetRcvFileStatus()==QFileTransfer::FILE_RCV_WAITING)
-    {
-        ShowFileTxSuccess("Начат прием файла");
-        ui->FileTransfer_progressBar->setValue(0);
-    }
-
     if(FileTransmitter.GetRcvFileStatus()==QFileTransfer::FILE_IS_IN_RCV_PROCESS)
     {
+        ShowFileTransferSuccess("Идет прием файла " + FileTransmitter.GetRcvFileName());
+
         //Возможно, изменился размер принятых данных - стоит перерисовать ProgressBar
         ui->FileTransfer_progressBar->setValue(100 * FileTransmitter.GetSizeOfRcvdFileData() / FileTransmitter.GetSizeOfRcvFile());
     }
@@ -992,7 +1000,7 @@ void MainWindow::SendFilePackToTransceiver()
 /**
    * @brief  Вывод в пользовательское окно ошибки передачи файла
    */
-void MainWindow::ShowFileTxError(QString strError)
+void MainWindow::ShowFileTransferError(QString strError)
 {
     QPalette pal = ui->FileTransferStatus_label->palette();
     pal.setColor(ui->FileTransferStatus_label->foregroundRole(), Qt::red);
@@ -1003,7 +1011,7 @@ void MainWindow::ShowFileTxError(QString strError)
 }
 
 
-void MainWindow::ShowFileTxSuccess(QString strSuccessMsg)
+void MainWindow::ShowFileTransferSuccess(QString strSuccessMsg)
 {
     QPalette pal = ui->FileTransferStatus_label->palette();
     pal.setColor(ui->FileTransferStatus_label->foregroundRole(), Qt::darkGreen);
@@ -1016,7 +1024,7 @@ void MainWindow::ShowFileTxSuccess(QString strSuccessMsg)
 /**
    * @brief  Очистка в пользовательском окне области ошибки передачи файла
    */
-void MainWindow::ClearFileTxError()
+void MainWindow::ClearFileTransferError()
 {
     ui->FileTransferStatus_label->setText("");
 }
@@ -1054,15 +1062,15 @@ void MainWindow::ShowFileSendErrorStatus()
     switch(FileTransmitter.GetErrorStatus())
     {
         case QFileTransfer::ERROR_DEVICE_CONNECTION:
-            ShowFileTxError("Данные не могут быть переданы. Устройство не подключено");
+            ShowFileTransferError("Данные не могут быть переданы. Устройство не подключено");
             break;
         case QFileTransfer::ERROR_FILE_IS_NOT_CHOSEN:
-            ShowFileTxError("Данные не могут быть переданы. Не выбран файл");
+            ShowFileTransferError("Данные не могут быть переданы. Не выбран файл");
             break;
         case QFileTransfer::ERROR_NONE:
             break;
         default:
-            ShowFileTxError("Данные не могут быть переданы. Неизвестная ошибка");
+            ShowFileTransferError("Данные не могут быть переданы. Неизвестная ошибка");
     }
 }
 
@@ -1108,7 +1116,8 @@ void MainWindow::SendSPIMMsg(uint8_t nSPIMmsgIDCmd)
             //Копируем настройки RadioModuleSettings в тело сообщения
             uint8_t nOpModeCode = SPIMMessage::CmdReqParam::OpModeCode(RadioModuleSettings->GetRadioChanType(),
                                                                                                                         RadioModuleSettings->GetRadioSignalPower(),
-                                                                                                                        RadioModuleSettings->GetARMPowerMode()) ;
+                                                                                                                        RadioModuleSettings->GetARMPowerMode(),
+                                                                                                                        RadioModuleSettings->GetRadioBaudRate() );
             uint8_t nAudioCode = SPIMMessage::CmdReqParam::AudioCode(RadioModuleSettings->GetAudioOutLevel(),
                                                                                                                RadioModuleSettings->GetAudioInLevel());
             uint16_t nFreqTxCode = RadioModuleSettings->GetTxFreqChan();
@@ -1199,14 +1208,16 @@ void MainWindow::ShowRadioModuleParams()
 {
     DenySetRadioModuleParams();
 
+    ui->OpMode_comboBox->setCurrentIndex(RadioModuleSettings->GetRadioBaudRate());
+
     double doubleFreqMhz;
 
-    doubleFreqMhz = (QRadioModuleSettings::RADIO_BASE_FREQ_KHZ +
-                                RadioModuleSettings->GetTxFreqChan()*QRadioModuleSettings::RADIO_FREQCHAN_STEP_KHZ) / 1000;
+    doubleFreqMhz = ((double)QRadioModuleSettings::RADIO_BASE_FREQ_KHZ +
+                                (double)RadioModuleSettings->GetTxFreqChan()*QRadioModuleSettings::RADIO_FREQCHAN_STEP_KHZ) / 1000;
     ui->FreqTx_SpinBox->setValue(doubleFreqMhz);
 
-    doubleFreqMhz = (QRadioModuleSettings::RADIO_BASE_FREQ_KHZ +
-                                RadioModuleSettings->GetRxFreqChan()*QRadioModuleSettings::RADIO_FREQCHAN_STEP_KHZ) / 1000;
+    doubleFreqMhz = ((double)QRadioModuleSettings::RADIO_BASE_FREQ_KHZ +
+                                (double)RadioModuleSettings->GetRxFreqChan()*QRadioModuleSettings::RADIO_FREQCHAN_STEP_KHZ) / 1000;
     ui->FreqRx_SpinBox->setValue(doubleFreqMhz);
 
     ui->Volume_spinBox->setValue(RadioModuleSettings->GetAudioOutLevel());
@@ -1232,3 +1243,77 @@ void MainWindow::AllowSetRadioModuleParams()
 {
     flAllowSetRadioModuleParams = true;
 }
+
+void MainWindow::on_FreqTx_SpinBox_valueChanged(double freqMHz)
+{
+    uint16_t noFreqTxChan, noFreqRxChan;
+    noFreqTxChan = ((uint32_t)round(1000*freqMHz) - QRadioModuleSettings::RADIO_BASE_FREQ_KHZ) / QRadioModuleSettings::RADIO_FREQCHAN_STEP_KHZ;
+
+    RadioModuleSettings->SetTxFreqChan(noFreqTxChan);
+
+    if(!ui->flagSimplex_checkBox->checkState())
+    {
+        noFreqRxChan = noFreqTxChan;
+        ui->FreqRx_SpinBox->setValue(freqMHz);
+        RadioModuleSettings->SetRxFreqChan(noFreqRxChan);
+    }
+
+    if(IsAllowSetRadioModuleParams())
+        SendSPIMMsg(SPIM_CMD_SET_MODE);
+}
+
+void MainWindow::on_FreqRx_SpinBox_valueChanged(double freqMHz)
+{
+    uint16_t noFreqRxChan = ((uint32_t)round(1000*freqMHz) - QRadioModuleSettings::RADIO_BASE_FREQ_KHZ) / QRadioModuleSettings::RADIO_FREQCHAN_STEP_KHZ;
+
+    RadioModuleSettings->SetRxFreqChan(noFreqRxChan);
+
+    if(IsAllowSetRadioModuleParams())
+        SendSPIMMsg(SPIM_CMD_SET_MODE);
+}
+
+void MainWindow::on_flagSimplex_checkBox_clicked(bool checked)
+{
+    if(checked)
+        ui->FreqRx_SpinBox->setEnabled(true);
+    else
+        ui->FreqRx_SpinBox->setEnabled(false);
+}
+
+void MainWindow::on_OpMode_comboBox_currentIndexChanged(int index)
+{
+    RadioModuleSettings->SetRadioBaudRate(index);
+
+    SetTimeIntervalsForCheckFileTransferStatus();
+
+    if(IsAllowSetRadioModuleParams())
+        SendSPIMMsg(SPIM_CMD_SET_MODE);
+}
+
+void MainWindow::SetTimeIntervalsForCheckFileTransferStatus()
+{
+    switch(RadioModuleSettings->GetRadioBaudRate())
+    {
+        case QRadioModuleSettings::RADIO_BAUD_RATE_4800:
+            TimeIntervalMsSendRadioPack = 180;
+            TimeIntervalMsCheckFileRcvStatus = 180;
+            break;
+        case QRadioModuleSettings::RADIO_BAUD_RATE_9600:
+            TimeIntervalMsSendRadioPack = 90;
+            TimeIntervalMsCheckFileRcvStatus = 90;
+            break;
+        case QRadioModuleSettings::RADIO_BAUD_RATE_19200:
+            TimeIntervalMsSendRadioPack = 45;
+            TimeIntervalMsCheckFileRcvStatus = 45;
+            break;
+        case QRadioModuleSettings::RADIO_BAUD_RATE_48000:
+            TimeIntervalMsSendRadioPack = 18;
+            TimeIntervalMsCheckFileRcvStatus = 18;
+            break;
+        default:
+            TimeIntervalMsSendRadioPack = 200;
+            TimeIntervalMsCheckFileRcvStatus = 200;
+    }
+}
+
+

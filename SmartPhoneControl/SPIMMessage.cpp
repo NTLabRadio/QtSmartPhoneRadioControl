@@ -343,13 +343,15 @@ uint8_t SPIMMessage::IDBackCmd(uint8_t IDCmd)
 }
 
 
-void SPIMMessage::ParseOpModeCode(uint8_t opModeCode, uint8_t& RadioChanType, uint8_t& SignalPower, uint8_t& ARMPowerMode) 
+void SPIMMessage::ParseOpModeCode(uint8_t opModeCode, uint8_t& RadioChanType, uint8_t& SignalPower, uint8_t& ARMPowerMode, uint8_t& BaudRate)
 {
 	RadioChanType	= (opModeCode>>SHIFT_RADIOCHANTYPE_IN_OPMODECODE)&MASK_RADIOCHANTYPE_IN_OPMODECODE;
 	
 	SignalPower = (opModeCode>>SHIFT_SIGNALPOWER_IN_OPMODECODE)&MASK_SIGNALPOWER_IN_OPMODECODE;
 	
 	ARMPowerMode = (opModeCode>>SHIFT_ARMPOWERMODE_IN_OPMODECODE)&MASK_ARMPOWERMODE_IN_OPMODECODE;
+
+    BaudRate = (opModeCode>>SHIFT_RADIOBAUDRATE_IN_OPMODECODE)&MASK_RADIOBAUDRATE_IN_OPMODECODE;
 }
 
 
@@ -365,11 +367,12 @@ void SPIMMessage::CmdReqParam::SetPointerToMessage(SPIMMessage* mes)
 	objSPIMMessage = mes;
 }
 
-uint8_t SPIMMessage::CmdReqParam::OpModeCode(uint8_t RadioChanType, uint8_t SignalPower, uint8_t ARMPowerMode) 
+uint8_t SPIMMessage::CmdReqParam::OpModeCode(uint8_t RadioChanType, uint8_t SignalPower, uint8_t ARMPowerMode, uint8_t BaudRate)
 {
- 	return( ((RadioChanType&MASK_RADIOCHANTYPE_IN_OPMODECODE)<<SHIFT_RADIOCHANTYPE_IN_OPMODECODE) |
-					((SignalPower&MASK_SIGNALPOWER_IN_OPMODECODE)<<SHIFT_SIGNALPOWER_IN_OPMODECODE)	|
-					((ARMPowerMode&MASK_ARMPOWERMODE_IN_OPMODECODE)<<SHIFT_ARMPOWERMODE_IN_OPMODECODE)	);
+    return( ((RadioChanType&MASK_RADIOCHANTYPE_IN_OPMODECODE)<<SHIFT_RADIOCHANTYPE_IN_OPMODECODE) |
+                    ((SignalPower&MASK_SIGNALPOWER_IN_OPMODECODE)<<SHIFT_SIGNALPOWER_IN_OPMODECODE)	|
+                    ((ARMPowerMode&MASK_ARMPOWERMODE_IN_OPMODECODE)<<SHIFT_ARMPOWERMODE_IN_OPMODECODE) |
+                    ((BaudRate&MASK_RADIOBAUDRATE_IN_OPMODECODE)<<SHIFT_RADIOBAUDRATE_IN_OPMODECODE)	);
 }
 
 

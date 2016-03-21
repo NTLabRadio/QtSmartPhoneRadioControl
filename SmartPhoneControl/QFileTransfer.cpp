@@ -115,9 +115,15 @@ quint16 QFileTransfer::PrepareToRcvNewFile()
 }
 
 
-QString QFileTransfer::GetFileName()
+
+QString QFileTransfer::GetFullSendFileName()
 {
     return(fileName);
+}
+
+QString QFileTransfer::GetSendFileName()
+{
+    return(fileNameReduced);
 }
 
 quint32 QFileTransfer::GetFileSize()
@@ -128,6 +134,11 @@ quint32 QFileTransfer::GetFileSize()
 quint32 QFileTransfer::GetSizeOfSendedFileData()
 {
     return(sizeOfSendedData);
+}
+
+QString QFileTransfer::GetRcvFileName()
+{
+    return(rcvFileNameReduced);
 }
 
 quint32 QFileTransfer::GetSizeOfRcvFile()

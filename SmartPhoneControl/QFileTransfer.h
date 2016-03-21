@@ -32,11 +32,15 @@ public:
 
     quint16 PrepareToRcvNewFile();
 
-    QString GetFileName();
+    QString GetFullSendFileName();
+
+    QString GetSendFileName();
 
     quint32 GetFileSize();
 
     quint32 GetSizeOfSendedFileData();
+
+    QString GetRcvFileName();
 
     quint32 GetSizeOfRcvFile();
 
