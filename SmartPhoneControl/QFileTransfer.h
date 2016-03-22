@@ -14,9 +14,11 @@
 #include <QFile>
 #include <QDebug>
 
+#include "qSmartRadioModuleControl.h"
 #include "SLIPinterface.h"
 #include "SPIMMessage.h"
-#include "qSmartRadioModuleControl.h"
+#include "typedef.h"
+
 
 class QFileTransfer : public QObject
 {
@@ -146,12 +148,14 @@ private:
         NUM_RADIO_DATA_TYPES
     };
 
+    #pragma pack(push, 1)
     struct RadioDataHeader
     {
-        quint16 radioDataType;
+        u16be radioDataType;
         quint8 fileName[MAX_SIZE_OF_FILE_NAME];
-        quint32 fileSize;
+        u32be fileSize;
     };
+    #pragma pack(pop)
 
     quint16 SendSPIMMsgToDevice(QSmartRadioModuleControl* RadioDevice, SPIMMessage SPIMmsgForSend);
 };

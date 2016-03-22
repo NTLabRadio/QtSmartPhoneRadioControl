@@ -1295,20 +1295,20 @@ void MainWindow::SetTimeIntervalsForCheckFileTransferStatus()
     switch(RadioModuleSettings->GetRadioBaudRate())
     {
         case QRadioModuleSettings::RADIO_BAUD_RATE_4800:
-            TimeIntervalMsSendRadioPack = 180;
-            TimeIntervalMsCheckFileRcvStatus = 180;
+            TimeIntervalMsSendRadioPack = 200;
+            TimeIntervalMsCheckFileRcvStatus = 200;
             break;
         case QRadioModuleSettings::RADIO_BAUD_RATE_9600:
-            TimeIntervalMsSendRadioPack = 90;
-            TimeIntervalMsCheckFileRcvStatus = 90;
+            TimeIntervalMsSendRadioPack = 100;
+            TimeIntervalMsCheckFileRcvStatus = 100;
             break;
         case QRadioModuleSettings::RADIO_BAUD_RATE_19200:
-            TimeIntervalMsSendRadioPack = 45;
-            TimeIntervalMsCheckFileRcvStatus = 45;
+            TimeIntervalMsSendRadioPack = 50;
+            TimeIntervalMsCheckFileRcvStatus = 50;
             break;
         case QRadioModuleSettings::RADIO_BAUD_RATE_48000:
-            TimeIntervalMsSendRadioPack = 18;
-            TimeIntervalMsCheckFileRcvStatus = 18;
+            TimeIntervalMsSendRadioPack = 20;
+            TimeIntervalMsCheckFileRcvStatus = 20;
             break;
         default:
             TimeIntervalMsSendRadioPack = 200;

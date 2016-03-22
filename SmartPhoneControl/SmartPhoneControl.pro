@@ -26,6 +26,8 @@ HEADERS  += mainwindow.h \
     ../QFileTransfer.h \
     QFileTransfer.h \
     SLIPinterface.h \
-    QRadioModuleSettings.h
+    QRadioModuleSettings.h \
+    LittleBigEndian.h \
+    typedef.h
 
 FORMS    += mainwindow.ui
