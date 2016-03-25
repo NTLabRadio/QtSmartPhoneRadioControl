@@ -52,6 +52,12 @@ MainWindow::MainWindow(QWidget *parent) :
     AllowSetRadioModuleParams();
 
     ui->OpMode_comboBox->addItems(QRadioModuleSettings::RadioBaudRateNames);
+
+    #ifdef DEBUG_TEST_QSS_PROGRESSBAR     
+     //SetFileSendProgressBarFail();
+     SetFileSendProgressBarSuccess();
+     ui->FileTransfer_progressBar->setValue(50);
+    #endif
 }
 
 
@@ -355,11 +361,13 @@ void MainWindow::ReceiveDataFromRadioModule(QByteArray baRcvdData)
     #ifdef DEBUG_SHOW_RCVD_SLIP_PACK
     ShowRcvdSLIPPack(QByteArray baRcvdData);
     #endif
-
+/*
     if(!baAccumRcvData.isEmpty() && (baAccumRcvData.size()+baRcvdData.size() < SLIPInterface::MAX_SIZE_OF_PACK))
         baAccumRcvData.append(baRcvdData);
     else
         baAccumRcvData = baRcvdData;
+*/
+    baAccumRcvData.append(baRcvdData);
 
     uint8_t* pSPIMmsgData;
     uint16_t SPIMmsgSize;
@@ -376,10 +384,22 @@ void MainWindow::ReceiveDataFromRadioModule(QByteArray baRcvdData)
     nResFindPackInData = SLIPInterface::FindPackInData((uint8_t*)baAccumRcvData.data(), (uint16_t)baAccumRcvData.size(),
                                                                                     pSPIMmsgData, SPIMmsgSize, nPosEndOfSLIPPack);
 
-    if(nResFindPackInData != SLIPInterface::PACK_FOUND)
+    //Если нашли только начало, то будем ждать приема остальной части SLIP-пакета, принятые данные оставим в baAccumRcvData
+    if(nResFindPackInData == SLIPInterface::PACK_BEGIN_FOUND)
         return;
 
-    baAccumRcvData.clear();
+    //Если не нашли полный пакет, то нечего обрабатывать - выходим из функции
+    if(nResFindPackInData != SLIPInterface::PACK_FOUND)
+    {
+        //Поскольку в данных не нашли не только полного пакета, но и даже начала пакета,
+        //или данные имеют некоректный формат, значит, они бесполезны.
+        //Очищаем буфер накопленных данных
+        baAccumRcvData.clear();
+        return;
+    }
+
+    //Удаляем из буфера обработанные данные
+    baAccumRcvData.remove(0,nPosEndOfSLIPPack);
 
     //Если найден SLIP пакет, записываем его полезные данные в SPIM сообщение
     SPIMBackCmd.setMsg(pSPIMmsgData,SPIMmsgSize);
@@ -390,6 +410,11 @@ void MainWindow::ReceiveDataFromRadioModule(QByteArray baRcvdData)
 
     //Обрабатываем команду от радиомодуля
     ProcessCmdFromRadioModule(&SPIMBackCmd);
+
+    //Если не все данные обработаны, рекурсивно вызываем функцию обработки
+    //TODO Опасное это дело - рекурсия. Надо бы переписать на цикл с ограничением по числу итераций
+    if(baAccumRcvData.size())
+        ReceiveDataFromRadioModule("");
 }
 
 
@@ -434,7 +459,8 @@ void MainWindow::ProcessDataPackFromRadioModule(SPIMMessage* SPIMMsgRcvd)
         InitFileRcvTimer();
 
         ShowFileTransferSuccess("Начат прием файла");
-        ui->FileTransfer_progressBar->setValue(0);
+        SetFileSendProgressBarInitProcess();
+        CurSizeOfRcvdFileData = 0;
     }
 
     emit signalRcvFilePack(SPIMMsgRcvd);
@@ -836,6 +862,7 @@ void MainWindow::on_SendFile_Button_clicked()
     {
         case QFileTransfer::FILE_IS_READY_FOR_SEND:
             ClearFileTransferError();
+            SetFileSendProgressBarInitProcess();
             //Стартуем таймер, контролирующий процесс передачи файла
             InitFileSendTimer();
             break;
@@ -846,6 +873,7 @@ void MainWindow::on_SendFile_Button_clicked()
             FileTransmitter.ResetFileForSend();
 
             ClearFileTransferError();
+            SetFileSendProgressBarInitProcess();
             //Стартуем таймер, контролирующий процесс передачи файла
             InitFileSendTimer();
             break;
@@ -887,6 +915,8 @@ void MainWindow::InitFileRcvTimer()
         connect(timerFileRcv,SIGNAL(timeout()),this,SLOT(CheckFileReceiveStatus()));
         timerFileRcv->setInterval(TimeIntervalMsCheckFileRcvStatus);
     }
+
+    TimeMsFileRcvNoActivity = 0;
 
     timerFileRcv->start();
 
@@ -982,8 +1012,28 @@ void MainWindow::CheckFileReceiveStatus()
     {
         ShowFileTransferSuccess("Идет прием файла " + FileTransmitter.GetRcvFileName());
 
-        //Возможно, изменился размер принятых данных - стоит перерисовать ProgressBar
-        ui->FileTransfer_progressBar->setValue(100 * FileTransmitter.GetSizeOfRcvdFileData() / FileTransmitter.GetSizeOfRcvFile());
+        //Если изменился размер принятых данных
+        if(CurSizeOfRcvdFileData != FileTransmitter.GetSizeOfRcvdFileData())
+        {
+            CurSizeOfRcvdFileData = FileTransmitter.GetSizeOfRcvdFileData();
+            TimeMsFileRcvNoActivity = 0;  //активность в процессе приема файла есть - сбрасываем таймер
+
+            //Изменился размер принятых данных - стоит перерисовать ProgressBar
+            ui->FileTransfer_progressBar->setValue(100 * CurSizeOfRcvdFileData / FileTransmitter.GetSizeOfRcvFile());
+        }
+        else
+        {
+            //Инкрементим время отсутствия активности в процессе приема файла
+            TimeMsFileRcvNoActivity+=TimeIntervalMsCheckFileRcvStatus;
+            //Если слишком долго ничего не принимаем, убиваем таймер, заканчиваем прием файла
+            if(TimeMsFileRcvNoActivity > MAX_TIME_NO_RCV_FILE_ACTIVITY_MS)
+            {
+                DeinitFileRcvTimer();
+                ShowFileTransferError("Файл не принят полностью. Истек таймаут ожидания данных от приемника");
+                SetFileSendProgressBarFail();
+                FileTransmitter.SetRcvFileStatus(QFileTransfer::FILE_RCV_ERROR);
+            }
+        }
     }
 
     return;
@@ -1035,10 +1085,25 @@ void MainWindow::ClearFileTransferError()
    */
 void MainWindow::SetFileSendProgressBarFail()
 {
+    /*
     QPalette pal = ui->FileTransfer_progressBar->palette();
     pal.setColor(QPalette::Highlight, QColor("red"));
     ui->FileTransfer_progressBar->setPalette(pal);
     ui->FileTransfer_progressBar->repaint();
+    */
+
+    QString st = QString (
+                "QProgressBar::chunk {"
+                "background-color: red;"    //#ff0000;"
+                 "}");
+
+    st.append("QProgressBar {"
+              "border: 1px solid grey;"
+              "border-radius: 2px;"
+              "text-align: center;"
+              "background: #eeeeee;"
+              "}");
+    ui->FileTransfer_progressBar->setStyleSheet(st);
 }
 
 /**
@@ -1048,10 +1113,44 @@ void MainWindow::SetFileSendProgressBarFail()
 void MainWindow::SetFileSendProgressBarSuccess()
 {
     ui->FileTransfer_progressBar->setValue(100);
+
+/*
     QPalette pal = ui->FileTransfer_progressBar->palette();
     pal.setColor(QPalette::Highlight, QColor("green"));
     ui->FileTransfer_progressBar->setPalette(pal);
     ui->FileTransfer_progressBar->repaint();
+*/
+
+    QString st = QString (
+                "QProgressBar::chunk {"
+                "background-color: lightgreen;"
+                 "}");
+
+    st.append("QProgressBar {"
+              "border: 1px solid grey;"
+              "border-radius: 2px;"
+              "text-align: center;"
+              "background: #eeeeee;"
+              "}");
+    ui->FileTransfer_progressBar->setStyleSheet(st);
+}
+
+void MainWindow::SetFileSendProgressBarInitProcess()
+{
+    ui->FileTransfer_progressBar->setValue(0);
+
+    QString st = QString (
+                "QProgressBar::chunk {"
+                "background-color: lightblue;"
+                 "}");
+
+    st.append("QProgressBar {"
+              "border: 1px solid grey;"
+              "border-radius: 2px;"
+              "text-align: center;"
+              "background: #eeeeee;"
+              "}");
+    ui->FileTransfer_progressBar->setStyleSheet(st);
 }
 
 /**

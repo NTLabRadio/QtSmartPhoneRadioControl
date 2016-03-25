@@ -6,6 +6,7 @@
 #include <QDebug>
 #include <QFileDialog>
 #include <QtSerialPort/QSerialPortInfo>
+#include <QPalette>
 
 #include "QFileTransfer.h"
 #include "QRadioModuleSettings.h"
@@ -151,6 +152,10 @@ private:
     static const quint16 PERIOD_MS_CHECK_FILE_RCV_STATUS = 200;
     quint16 TimeIntervalMsCheckFileRcvStatus;
 
+    quint32 CurSizeOfRcvdFileData;
+    quint32 TimeMsFileRcvNoActivity;
+    static const quint32 MAX_TIME_NO_RCV_FILE_ACTIVITY_MS = 2000;
+
     quint32 timeTransmitterBusyMs;
 
     void InitFileSendTimer();
@@ -161,6 +166,7 @@ private:
 
     void SetFileSendProgressBarFail();
     void SetFileSendProgressBarSuccess();
+    void SetFileSendProgressBarInitProcess();
 
     void ShowFileSendErrorStatus();
 
@@ -179,6 +185,8 @@ private:
     bool flAllowSetRadioModuleParams;
 
     void SetTimeIntervalsForCheckFileTransferStatus();
+
+
 };
 
 #endif // MAINWINDOW_H

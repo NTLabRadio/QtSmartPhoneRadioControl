@@ -69,6 +69,7 @@ public:
 
     quint16 GetSendFileStatus();
     quint16 GetRcvFileStatus();
+    void SetRcvFileStatus(quint16 status);
 
     enum en_transmitterStatuses
     {

@@ -162,6 +162,12 @@ quint16 QFileTransfer::GetRcvFileStatus()
     return(rcvFileStatus);
 }
 
+void QFileTransfer::SetRcvFileStatus(quint16 status)
+{
+    rcvFileStatus = (en_rcvFileStatuses)status;
+
+    return;
+}
 
 void QFileTransfer::SetTransmitterStatus(quint16 status)
 {
@@ -312,6 +318,7 @@ void QFileTransfer::slotProcessFileDataPack(SPIMMessage* SPIMmsg)
         {
             qDebug() << "WARNING! QFileTransfer::slotProcessFileDataPack() Файл не может быть открыт для записи";
             errorStatus = ERROR_FILE_OPEN;
+            rcvFileStatus = FILE_RCV_ERROR;
             return;
         }
 

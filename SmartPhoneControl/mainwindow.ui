@@ -27,7 +27,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>0</number>
+     <number>2</number>
     </property>
     <widget class="QWidget" name="RadioModuleControl_tab">
      <attribute name="title">
@@ -466,7 +466,11 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="SLIPTxData_lineEdit"/>
+        <widget class="QLineEdit" name="SLIPTxData_lineEdit">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+        </widget>
        </item>
        <item>
         <widget class="QLabel" name="SLIPTxStatus_label">
@@ -501,7 +505,11 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="SLIPRxData_lineEdit"/>
+        <widget class="QLineEdit" name="SLIPRxData_lineEdit">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+        </widget>
        </item>
        <item>
         <widget class="QLabel" name="SLIPRxPayload_label">
@@ -512,6 +520,9 @@
        </item>
        <item>
         <widget class="QLineEdit" name="SLIPRxPayload_lineEdit">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
          <property name="text">
           <string/>
          </property>
